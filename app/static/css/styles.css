@@ -1,0 +1,16 @@
+body {
+    background-color: white;
+}
+
+.carousel-item img {
+  height: 350px;
+  width: 100%;
+  object-fit: cover;
+}
+
+.carousel-item img {
+  transition: transform 1s ease-in-out;
+}
+.carousel-item.active img {
+  transform: scale(1.02);
+}

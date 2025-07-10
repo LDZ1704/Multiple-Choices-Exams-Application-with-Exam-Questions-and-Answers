@@ -1,1 +1,113 @@
 {% extends 'layout/base.html' %}
+
+{% block content %}
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <span class="badge bg-primary mb-2">Hiệu quả</span>
+                <h2 class="fw-bold">Học tập <span class="text-primary">mọi lúc mọi nơi</span></h2>
+                <p><i class="bi bi-wifi"></i> Bất kể bạn đang ở đâu, chỉ cần có thiết bị kết nối internet, bạn đều có
+                    thể học tập.</p>
+                <p><i class="bi bi-phone"></i> Bạn có thể học trên điện thoại thông minh, máy tính bảng, laptop hoặc máy
+                    tính để bàn.</p>
+                <p><i class="bi bi-journal-richtext"></i> Khám phá kho đề thi khổng lồ giúp bạn học tập hiệu quả hơn.
+                </p>
+
+                <div class="input-group mt-4">
+                    <input type="text" class="form-control" placeholder="Tìm kiếm đề thi...">
+                    <button class="btn btn-primary"><i class="bi bi-search"></i></button>
+                </div>
+            </div>
+
+            <!-- Slider -->
+            <div class="col-lg-6">
+                <div id="heroSlider" class="carousel slide" data-bs-ride="carousel">
+                    <div class="carousel-inner">
+                        <div class="carousel-item active">
+                            <img src="{{ url_for('static', filename='images/demo.png') }}"
+                                 class="d-block rounded" alt="Slide 1">
+                        </div>
+                        <div class="carousel-item">
+                            <img src="{{ url_for('static', filename='images/home.jpg') }}"
+                                 class="d-block rounded" alt="Slide 2">
+                        </div>
+                        <div class="carousel-item">
+                            <img src="{{ url_for('static', filename='images/login&register.jpg') }}"
+                                 class="d-block rounded" alt="Slide 3">
+                        </div>
+                    </div>
+                    <button class="carousel-control-prev" type="button" data-bs-target="#heroSlider"
+                            data-bs-slide="prev">
+                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Previous</span>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#heroSlider"
+                            data-bs-slide="next">
+                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Next</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="fw-bold">Đề thi</h4>
+        </div>
+        <div class="row g-4">
+            <!-- Card 1 -->
+            <div class="col-md-3">
+                <div class="card">
+                    <img src="{{ url_for('static', filename='images/demo.png') }}" class="card-img-top">
+                    <div class="card-body">
+                        <h6 class="card-title">Tên đề thi</h6>
+                        <p class="text-muted mb-1">10/07/2025</p>
+                        <p><i class="bi bi-eye"></i> 0 &nbsp; <i class="bi bi-chat-left"></i> 0</p>
+                        <button type="submit" class="btn btn-primary btn-lg w-100"><a href="/examdetail" class="text-white text-decoration-none">Vào đề thi</a></button>
+                    </div>
+                </div>
+            </div>
+            <!-- Card 2 -->
+            <div class="col-md-3">
+                <div class="card">
+                    <img src="{{ url_for('static', filename='images/demo.png') }}" class="card-img-top">
+                    <div class="card-body">
+                        <h6 class="card-title">Tên đề thi</h6>
+                        <p class="text-muted mb-1">10/07/2025</p>
+                        <p><i class="bi bi-eye"></i> 0 &nbsp; <i class="bi bi-chat-left"></i> 0</p>
+                        <button type="submit" class="btn btn-primary btn-lg w-100"><a href="/examdetail" class="text-white text-decoration-none">Vào đề thi</a></button>
+                    </div>
+                </div>
+            </div>
+            <!-- Card 3 -->
+            <div class="col-md-3">
+                <div class="card">
+                    <img src="{{ url_for('static', filename='images/demo.png') }}" class="card-img-top">
+                    <div class="card-body">
+                        <h6 class="card-title">Tên đề thi</h6>
+                        <p class="text-muted mb-1">10/07/2025</p>
+                        <p><i class="bi bi-eye"></i> 0 &nbsp; <i class="bi bi-chat-left"></i> 0</p>
+                        <button type="submit" class="btn btn-primary btn-lg w-100"><a href="/examdetail" class="text-white text-decoration-none">Vào đề thi</a></button>
+                    </div>
+                </div>
+            </div>
+            <!-- Card 4 -->
+            <div class="col-md-3">
+                <div class="card">
+                    <img src="{{ url_for('static', filename='images/demo.png') }}" class="card-img-top">
+                    <div class="card-body">
+                        <h6 class="card-title">Tên đề thi</h6>
+                        <p class="text-muted mb-1">10/07/2025</p>
+                        <p><i class="bi bi-eye"></i> 0 &nbsp; <i class="bi bi-chat-left"></i> 0</p>
+                        <button type="submit" class="btn btn-primary btn-lg w-100"><a href="/examdetail" class="text-white text-decoration-none">Vào đề thi</a></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
