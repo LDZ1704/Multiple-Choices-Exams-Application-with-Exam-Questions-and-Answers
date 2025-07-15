@@ -1,0 +1,62 @@
+{% extends 'layout/base.html' %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Bài thi trắc nghiệm</h2>
+        <h4 id="timer" class="text-danger">Thời gian: 01:00</h4>
+    </div>
+
+    <form id="quizForm">
+        <!-- Câu 1 -->
+        <div class="mb-4">
+            <h5>Câu 1: HTML là viết tắt của cụm từ nào?</h5>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="q1" id="q1a" value="a">
+                <label class="form-check-label" for="q1a">A. HighText Machine Language</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="q1" id="q1b" value="b">
+                <label class="form-check-label" for="q1b">B. HyperText and links Markup Language</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="q1" id="q1c" value="c">
+                <label class="form-check-label" for="q1c">C. HyperText Markup Language</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="q1" id="q1d" value="d">
+                <label class="form-check-label" for="q1d">D. None of these</label>
+            </div>
+        </div>
+
+        <!-- Câu 2 -->
+        <div class="mb-4">
+            <h5>Câu 2: Ngôn ngữ nào dùng để tạo kiểu cho trang web?</h5>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="q2" id="q2a" value="a">
+                <label class="form-check-label" for="q2a">A. HTML</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="q2" id="q2b" value="b">
+                <label class="form-check-label" for="q2b">B. CSS</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="q2" id="q2c" value="c">
+                <label class="form-check-label" for="q2c">C. JavaScript</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="q2" id="q2d" value="d">
+                <label class="form-check-label" for="q2d">D. PHP</label>
+            </div>
+        </div>
+
+        <!-- Nút nộp -->
+        <div class="text-center mb-4">
+            <button type="submit" class="btn btn-primary">Nộp bài</button>
+        </div>
+
+        <!-- Kết quả -->
+        <div id="result" class="alert alert-info d-none text-center"></div>
+    </form>
+</div>
+{% endblock %}

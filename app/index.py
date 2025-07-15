@@ -1,5 +1,4 @@
-from app import app
-from flask import Flask, render_template
+from flask import Flask, render_template, url_for
 
 app = Flask(__name__)
 
@@ -22,6 +21,18 @@ def exam_detail():
 @app.route('/account')
 def account_detail():
     return(render_template('account.html'))
+
+@app.route('/forgot-password')
+def forgot_password():
+    return(render_template('forgot-password.html'))
+
+@app.route('/subjects')
+def subjects():
+    return(render_template('subjects.html'))
+
+@app.route('/doing-exam')
+def doing_exam():
+    return(render_template('doing-exam.html'))
 
 if __name__ == '__main__':
     app.run(debug=True)
