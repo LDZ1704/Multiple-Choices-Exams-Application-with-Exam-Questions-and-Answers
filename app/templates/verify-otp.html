@@ -13,26 +13,30 @@
             <div class="w-75">
                 <h3 class="fw-bold mb-3">Quên mật khẩu</h3>
                 <p class="text-muted">
-                    Vui lòng nhập địa chỉ email của bạn và kiểm tra hộp thư đến để lấy mật khẩu mới.
+                    Vui lòng nhập OTP được gửi về email của bạn.
                 </p>
                 <form method="post">
                     <div class="mb-3">
-                        <label for="email" class="form-label">Email</label>
-                        <input type="email" name="email" class="form-control" id="email"
-                               placeholder="Nhập Email của bạn">
-                        {% if err_message %}
-                        <div class="mt-3 alert alert-danger text-center">{{ err_message }}</div>
-                        {% endif %}
+                        <label for="otp" class="form-label">Mã OTP</label>
+                        <input type="otp" name="otp" class="form-control" id="otp"
+                               placeholder="000000" maxlength="6" required>
                     </div>
                     <button type="submit" class="btn w-100 fs-5 text-white hover-underline-center"
-                            style="background: #384AD5;">Xác nhận & gửi mã OTP
+                            style="background: #384AD5;">Xác nhận
                     </button>
+                    <div class="mt-3 text-center mb-3">
+                        <a href="{{ url_for('forgot_password') }}">← Gửi lại mã OTP</a>
+                    </div>
                 </form>
-                <div class="text-center mt-3">
-                    <span>Bạn đã có tài khoản? <a href="/login">Đăng nhập</a></span>
-                </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    // Chỉ cho phép nhập số
+    document.getElementById('otp').addEventListener('input', function(e) {
+        this.value = this.value.replace(/[^0-9]/g, '');
+    });
+</script>
 {% endblock %}

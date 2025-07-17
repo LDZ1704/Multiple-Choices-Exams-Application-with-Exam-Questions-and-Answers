@@ -14,6 +14,7 @@ class Role(RoleEnum):
 
 class Base(db.Model):
     __abstract__ = True
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, nullable=False, autoincrement=True)
 
 
@@ -32,16 +33,28 @@ class User(Base, UserMixin):
     student = relationship("Student", back_populates="user", uselist=False)
     admin = relationship("Admin", back_populates="user", uselist=False)
 
+    def get_id(self):
+        return str(self.id)
+    @property
+    def is_authenticated(self):
+        return True
+    @property
+    def is_active(self):
+        return True
+    @property
+    def is_anonymous(self):
+        return False
+
 
 class Student(Base):
-    user_id = Column(Integer, ForeignKey('user.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey('user.id'), nullable=False, unique=True)
 
     user = relationship("User", back_populates="student")
     exam_results = relationship("ExamResult", back_populates="student")
 
 
 class Admin(Base):
-    user_id = Column(Integer, ForeignKey('user.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey('user.id'), nullable=False, unique=True)
 
     user = relationship("User", back_populates="admin")
     subjects = relationship("Subject", back_populates="admin")
@@ -129,10 +142,10 @@ class ExamQuestions(Base):
 
 if __name__ == '__main__':
     with app.app_context():
-        # db.drop_all()
+        db.drop_all()
         db.create_all()
 
-        #DỮ LIỆU MẪU CHO DATABASE
+        # DỮ LIỆU MẪU CHO DATABASE
         # Tạo records cho User
         admin_user = User(
             name="Lâm",

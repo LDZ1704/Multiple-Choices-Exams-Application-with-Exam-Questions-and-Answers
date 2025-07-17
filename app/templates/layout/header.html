@@ -12,25 +12,46 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link text-white text-decoration-none hover-underline-center" aria-current="page" href="/">Trang chủ</a>
+                        <a class="nav-link text-white text-decoration-none hover-underline-center" aria-current="page"
+                           href="/">Trang chủ</a>
                     </li>
                 </ul>
                 <ul class="navbar-nav">
+                    {% if current_user.role|string == 'Role.ADMIN' %}
                     <li class="nav-item">
-                        <a class="nav-link text-white text-decoration-none hover-underline-center" href="/subjects">Môn học</a>
+                        <a class="nav-link text-white text-decoration-none hover-underline-center" href="/admin">Trang
+                            quản trị</a>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item">
+                        <a class="nav-link text-white text-decoration-none hover-underline-center" href="/subjects">Môn
+                            học</a>
+                    </li>
+                    {% if current_user.is_authenticated %}
+                    <li class="nav-item">
+                        <a class="nav-link text-white text-decoration-none hover-underline-center" href="/account">Tài
+                            khoản</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link text-white text-decoration-none hover-underline-center" href="/account">Tài khoản</a>
-                    </li>
-                    <!--                    <li class="nav-item">-->
-                    <!--                        <a class="nav-link" href="/logout">Logout</a>-->
-                    <!--                    </li>-->
-                    <li class="nav-item">
-                        <a class="nav-link text-white text-decoration-none hover-underline-center" href="/login">Đăng nhập</a>
+                        <a class="nav-link text-white text-decoration-none hover-underline-center" href="/logout">Đăng
+                            xuất</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link text-white text-decoration-none hover-underline-center" href="/register">Đăng ký</a>
+                        <a class="nav-link text-white text-decoration-none" href="#">
+                            <img src="{{ current_user.avatar }}" alt="avatar" width="30" style="border-radius: 10px">
+                            Hello {{ current_user.name }}
+                        </a>
                     </li>
+                    {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link text-white text-decoration-none hover-underline-center" href="/login">Đăng
+                            nhập</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white text-decoration-none hover-underline-center" href="/register">Đăng
+                            ký</a>
+                    </li>
+                    {% endif %}
                 </ul>
             </div>
         </div>

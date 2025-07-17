@@ -6,8 +6,10 @@
         <!-- Cột minh họa bên trái -->
         <div class="col-md-6 d-none d-md-flex align-items-center justify-content-center p-0">
             <div class="text-center">
-                <img src="https://res.cloudinary.com/denmq54ke/image/upload/v1752161601/login_register_d1oj9t.png" alt="LoginImg"
-                     class="img-fluid w-100 h-100 object-fit-cover" style="position: relative; width: 100%; height: 100%; object-fit: cover; transition-property: opacity; transition-duration: 1500ms; transition-timing-function: cubic-bezier(0.7, 0, 0.6, 1); opacity: 1; animation: 3000ms cubic-bezier(0.7, 0, 0.6, 1) 0s 1 normal none running materialize;">
+                <img src="https://res.cloudinary.com/denmq54ke/image/upload/v1752161601/login_register_d1oj9t.png"
+                     alt="LoginImg"
+                     class="img-fluid w-100 h-100 object-fit-cover"
+                     style="position: relative; width: 100%; height: 100%; object-fit: cover; transition-property: opacity; transition-duration: 1500ms; transition-timing-function: cubic-bezier(0.7, 0, 0.6, 1); opacity: 1; animation: 3000ms cubic-bezier(0.7, 0, 0.6, 1) 0s 1 normal none running materialize;">
             </div>
         </div>
 
@@ -15,34 +17,47 @@
         <div class="col-md-6 d-flex align-items-center justify-content-center">
             <div class="w-75">
                 <h3 class="mb-4 text-center">Đăng ký</h3>
-                <form>
+                <form method="post">
                     <div class="mb-3">
                         <label for="username" class="form-label">Tên tài khoản</label>
-                        <input type="username" class="form-control" id="username" placeholder="Nhập tên tài khoản">
+                        <input type="username" name="username" class="form-control" id="username"
+                               placeholder="Nhập tên tài khoản" required>
                     </div>
                     <div class="mb-3">
                         <label for="email" class="form-label">Email</label>
-                        <input type="email" class="form-control" id="email" placeholder="Nhập email">
+                        <input type="email" name="email" class="form-control" id="email" placeholder="Nhập email" required>
                     </div>
                     <div class="mb-3">
                         <label for="name" class="form-label">Họ và tên</label>
-                        <input type="name" class="form-control" id="name" placeholder="Nhập tên tài khoản">
+                        <input type="name" name="name" class="form-control" id="name" placeholder="Nhập họ và tên" required>
+                    </div>
+                    <div class="text-start mb-3">
+                        <p>Giới tính</p>
+                        <label>
+                            <input type="radio" name="gender" value="Male"> Male
+                        </label>
+                        <label>
+                            <input type="radio" name="gender" value="Female"> Female
+                        </label>
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">Mật khẩu</label>
                         <div class="input-group">
-                            <input type="password" class="form-control" id="password" placeholder="Nhập mật khẩu">
+                            <input type="password" name="password" class="form-control" id="password"
+                                   placeholder="Nhập mật khẩu" required>
                         </div>
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">Xác nhận mật khẩu</label>
                         <div class="input-group">
-                            <input type="password" class="form-control" id="password" placeholder="Nhập mật khẩu">
+                            <input type="password" name="confirm-password" class="form-control" id="confirm-password"
+                                   placeholder="Nhập lại mật khẩu" required>
                         </div>
                     </div>
 
                     <div class="d-grid">
-                        <button type="submit" class="btn w-100 fs-5 text-white hover-underline-center" style="background: #384AD5;"><a href="/" class="text-white text-decoration-none">Đăng ký</a>
+                        <button type="submit" class="btn w-100 fs-5 text-white hover-underline-center"
+                                style="background: #384AD5;">Đăng ký</button>
                     </div>
                 </form>
             </div>
