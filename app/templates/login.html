@@ -19,7 +19,7 @@
                 {% if err_message %}
                 <div class="alert alert-danger">{{ err_message }}</div>
                 {% endif %}
-                <form method="post">
+                <form method="post" action="{{ url_for('login', next=next_page) }}">
                     <div class="mb-3">
                         <label for="email" class="form-label">Tài khoản đăng nhập</label>
                         <input name="username" class="form-control" id="email" placeholder="Nhập email hoặc tài khoản" required>
@@ -48,4 +48,5 @@
         </div>
     </div>
 </div>
+
 {% endblock %}

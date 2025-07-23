@@ -35,20 +35,28 @@
 <div class="container bg-white shadow rounded p-4 mb-5">
     <div class="row g-4">
         <div class="col-md-3 text-center">
-            <img src="{{ url_for('static', filename='images/demo.png') }}" class="img-fluid rounded border"
-                 alt="Đề thi">
+            <img src="{{ exam.image or url_for('static', filename='images/demo.png') }}"
+                 class="img-fluid rounded border" alt="{{ exam.exam_name }}">
         </div>
         <div class="col-md-6">
-            <h5 class="fw-bold">Tên đề thi</h5>
-            <div class="text-muted mb-2">Tên tác giả</div>
-            <div class="text-muted mb-2">Mô tả: ...</div>
+            <h5 class="fw-bold">{{ exam.exam_name }}</h5>
+            <div class="text-muted mb-2">Tác giả: {{ exam.createBy if exam.createBy else 'Ẩn danh' }}</div>
             <div class="mb-2">
-                <i class="bi bi-calendar-event"></i> 10/07/2025
+                <i class="bi bi-calendar-event"></i> {{ exam.createAt.strftime('%d/%m/%Y') }}
             </div>
             <div class="mb-2">
-                <span class="badge bg-warning text-dark me-2"><i class="bi bi-eye"></i> 0</span>
-                <span class="badge bg-primary me-2"><i class="bi bi-bar-chart"></i> 0</span>
-                <span class="badge bg-info text-dark"><i class="bi bi-person"></i> 0</span>
+                <strong>Môn học:</strong> {{ exam.subject.subject_name }}
+            </div>
+            <div class="mb-2">
+                <span class="badge bg-primary me-2">
+                    <i class="bi bi-bar-chart"></i> {{ stats.avg_score }}/100
+                </span>
+                <span class="badge bg-info text-dark me-2">
+                    <i class="bi bi-person"></i> {{ stats.total_attempts }} lượt thi
+                </span>
+                <span class="badge bg-success">
+                    <i class="bi bi-question-circle"></i> {{ question_count }} câu hỏi
+                </span>
             </div>
         </div>
         <div class="col-md-3 text-center">
@@ -60,59 +68,267 @@
             </div>
             <div class="d-flex justify-content-center mb-3">------------------- Hoặc -------------------</div>
             <div class="d-grid gap-2 mb-2">
-                <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-link-45deg"></i> Sao chép link</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="copyToClipboard()">
+                    <i class="bi bi-link-45deg"></i> Sao chép link
+                </button>
                 <button class="btn btn-outline-primary btn-sm"><i class="bi bi-qr-code-scan"></i> Quét mã QR</button>
             </div>
         </div>
     </div>
     <div class="row mt-4">
         <div class="col-md-12 d-grid">
-            <button class="btn w-100 fs-5 text-white hover-underline-center" style="background: #384AD5;"><a href="/doing-exam" class="text-decoration-none text-white"><i class="bi bi-play-circle"></i> Bắt đầu ôn thi</a></button>
+            {% if current_user.is_authenticated %}
+            <a href="{{ url_for('doing_exam', exam_id=exam.id) }}"
+               class="btn fs-5 text-white text-decoration-none hover-underline-center" style="background: #384AD5;">
+                <i class="bi bi-play-circle"></i> Bắt đầu ôn thi
+            </a>
+            {% else %}
+            <a href="{{ url_for('login', next=url_for('doing_exam', exam_id=exam.id)) }}"
+               class="btn fs-5 text-white text-decoration-none hover-underline-center" style="background: #384AD5;">
+                <i class="bi bi-play-circle"></i> Bắt đầu ôn thi
+            </a>
+            {% endif %}
         </div>
     </div>
 
-    <div class="alert alert-info mt-4 small" role="alert">
-        <i class="bi bi-info-circle-fill"></i> Tài liệu ôn thi chỉ có giá trị tham khảo và ôn tập, không phải đề thi
-        thực tế.
-    </div>
-</div>
-
-<!--Lịch sử làm bài nếu đã đăng nhập-->
-
-
-<!--Bình luận-->
-<div class="container">
-  <div class="card shadow-sm p-4 mb-5">
-    <div class="card-body">
-      <ul class="nav nav-tabs mb-3">
-        <li class="nav-item">
-          <a class="nav-link active" href="#">Đánh giá</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="#">Kết quả ôn tập</a>
-        </li>
-      </ul>
-
-      <div class="card mb-3 border border-light shadow-sm">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <div class="d-flex align-items-center">
-              <img src="{{ url_for('static', filename='images/demo.png') }}" class="img-fluid rounded-circle me-3" style="width: 5rem; height: 5rem;" alt="avatar">
-              <div>
-                <strong>username</strong><br>
-                <small class="text-muted">Chức vụ</small>
-              </div>
+    <div class="notification-box notification-warning mt-2">
+        <div class="notification-content">
+            <i class="bi bi-info-circle-fill notification-icon"></i>
+            <div class="notification-text small-text">
+                Tài liệu ôn thi chỉ có giá trị tham khảo và ôn tập, không phải đề thi thực tế.
             </div>
-          </div>
-          <div class="text-body">
-            <p class="mb-1">
-                Nội dung
-            </p>
-            <small class="text-muted">16:47 - 10/07/2025</small>
-          </div>
         </div>
-      </div>
     </div>
-  </div>
 </div>
+
+<!-- Tab content -->
+<div class="container">
+    <div class="card shadow-sm p-4 mb-5">
+        <div class="card-body">
+            <ul class="nav nav-tabs mb-3" id="examTabs">
+                <li class="nav-item">
+                    <a class="nav-link active" data-bs-toggle="tab" href="#reviews" id="reviews-tab">
+                        Bình luận ({{ comments_pagination.total }})
+                    </a>
+                </li>
+                {% if current_user.is_authenticated %}
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#results" id="results-tab">
+                        Kết quả ôn tập ({{ user_results|length if user_results else 0 }})
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+
+            <div class="tab-content">
+                <!-- Tab bình luận -->
+                <div class="tab-pane fade show active" id="reviews">
+                    {% if current_user.is_authenticated %}
+                    <div class="card mb-4 border-primary">
+                        <div class="card-body">
+                            <h6 class="card-title">Viết bình luận</h6>
+                            <form method="POST" action="{{ url_for('add_exam_comment') }}">
+                                <input type="hidden" name="exam_id" value="{{ exam.id }}">
+                                <div class="mb-3">
+                                    <textarea class="form-control" name="content" rows="3"
+                                              placeholder="Chia sẻ cảm nhận của bạn về đề thi này..."></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary" style="background-color: #384AD5;">Gửi bình luận</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="notification-box notification-info">
+                        <div class="notification-content">
+                            <i class="bi bi-info-circle notification-icon"></i>
+                            <div class="notification-text">
+                                <a href="{{ url_for('login', next=url_for('exam_detail', exam_id=exam.id)) }}" class="login-link">Đăng nhập</a>
+                                để viết đánh giá và xem kết quả ôn tập.
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Danh sách bình luận -->
+                    {% if comments_pagination.items %}
+                    {% for comment in comments_pagination.items %}
+                    <div class="card mb-3 border border-light shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="d-flex align-items-center">
+                                    <img src="{{ comment.user.avatar or url_for('static', filename='images/demo.png') }}"
+                                         class="img-fluid rounded-circle me-3"
+                                         style="width: 3rem; height: 3rem;" alt="avatar">
+                                    <div>
+                                        <strong>{{ comment.user.name }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ 'Quản trị viên' if comment.user.role.name ==
+                                            'ADMIN' else 'Học sinh' }}</small>
+                                    </div>
+                                </div>
+                                <small class="text-muted">
+                                    {{ comment.created_at.strftime('%H:%M - %d/%m/%Y') }}
+                                </small>
+                            </div>
+                            <div class="text-body">
+                                <p class="mb-0">{{ comment.content }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    <!-- Phân trang đánh giá -->
+                    {% if comments_pagination.pages > 1 %}
+                    <nav aria-label="Comments pagination" id="comments-pagination">
+                        <ul class="pagination justify-content-center">
+                            {% if comments_pagination.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link"
+                                   href="?id={{ exam.id }}&comment_page={{ comments_pagination.prev_num }}">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+
+                            {% for page_num in comments_pagination.iter_pages() %}
+                            {% if page_num %}
+                            {% if page_num != comments_pagination.page %}
+                            <li class="page-item">
+                                <a class="page-link"
+                                   href="?id={{ exam.id }}&comment_page={{ page_num }}">
+                                    {{ page_num }}
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% endif %}
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">…</span>
+                            </li>
+                            {% endif %}
+                            {% endfor %}
+
+                            {% if comments_pagination.has_next %}
+                            <li class="page-item">
+                                <a class="page-link"
+                                   href="?id={{ exam.id }}&comment_page={{ comments_pagination.next_num }}">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-chat-dots fs-1"></i>
+                        <p class="mt-2">Chưa có đánh giá nào cho đề thi này.</p>
+                        {% if current_user.is_authenticated %}
+                        <p>Hãy là người đầu tiên đánh giá!</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Tab Kết quả ôn tập -->
+                {% if current_user.is_authenticated %}
+                <div class="tab-pane fade" id="results">
+                    {% if user_results %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Lần thi</th>
+                                <th>Điểm số</th>
+                                <th>Thời gian làm bài</th>
+                                <th>Ngày thi</th>
+                                <th>Trạng thái</th>
+                                <th>Hành động</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for result in user_results %}
+                            <tr>
+                                <td>{{ loop.revindex }}</td>
+                                <td>
+                                    <span class="badge {% if result.score >= 8 %}bg-success{% elif result.score >= 6.5 %}bg-warning{% else %}bg-danger{% endif %}">
+                                        {{ result.score }}/100
+                                    </span>
+                                </td>
+                                <td>{{ exam.duration }} phút</td>
+                                <td>{{ result.taken_exam.strftime('%H:%M %d/%m/%Y') }}</td>
+                                <td>
+                                    {% if result.score >= 5 %}
+                                    <span class="text-success">Đạt</span>
+                                    {% else %}
+                                    <span class="text-danger">Không đạt</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('view_exam_result', result_id=result.id) }}"
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> Xem chi tiết
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Thống kê cá nhân -->
+                    <div class="row mt-4">
+                        <div class="col-md-4">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title text-primary">{{ user_results|length }}</h5>
+                                    <p class="card-text">Số lần thi</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title text-success">
+                                        {% if user_results|length > 0 %}
+                                        {{ "%.1f"|format((user_results|sum(attribute='score'))/user_results|length)
+                                        }}/100
+                                        {% else %}
+                                        0/100
+                                        {% endif %}
+                                    </h5>
+                                    <p class="card-text">Điểm trung bình</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title text-warning">
+                                        {{ user_results|selectattr('score', '>=', 5)|list|length }}
+                                    </h5>
+                                    <p class="card-text">Số lần đạt</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-graph-up fs-1"></i>
+                        <p class="mt-2">Bạn chưa thi đề này.</p>
+                        <a href="{{ url_for('doing_exam', exam_id=exam.id) }}" class="btn text-white text-decoration-none hover-underline-center" style="background: #384AD5;">
+                            <i class="bi bi-play-circle"></i> Bắt đầu thi ngay
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

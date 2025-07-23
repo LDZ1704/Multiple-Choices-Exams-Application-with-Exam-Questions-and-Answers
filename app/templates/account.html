@@ -4,56 +4,76 @@
 <div class="container mt-5 mb-5">
     <div class="row justify-content-center">
         <div class="col-md-10">
-            <!-- Card Container -->
             <div class="card shadow border-0 rounded">
-                <!-- Card Header -->
                 <div class="card-header text-white text-center py-3" style="background: #384AD5;">
                     <h4 class="mb-0">Thông tin tài khoản</h4>
                 </div>
-                <!-- Card Body -->
                 <div class="card-body">
                     <div class="row g-4">
                         <!-- Avatar -->
                         <div class="col-md-4 text-center">
-                            <img src="https://res.cloudinary.com/denmq54ke/image/upload/v1752161601/login_register_d1oj9t.png" alt="Avatar"
-                                 class="rounded-circle img-fluid border" width="200">
-                            <button class="btn text-white mt-3 w-100 hover-underline-center" style="background: #384AD5;">Thay ảnh đại diện
-                            </button>
+                            <img src="{{ current_user.avatar }}" alt="Avatar"
+                                 class="rounded-circle img-fluid border" width="200" id="avatar-preview">
+                            <form action="{{ url_for('update_avatar') }}" method="POST" enctype="multipart/form-data"
+                                  id="avatar-form">
+                                <input type="file" name="avatar" id="avatar-input" accept="image/*"
+                                       style="display: none;">
+                                <button type="button" class="btn text-white mt-3 w-100 hover-underline-center"
+                                        style="background: #384AD5;"
+                                        onclick="document.getElementById('avatar-input').click()">
+                                    Thay ảnh đại diện
+                                </button>
+                            </form>
                         </div>
                         <!-- User Information -->
                         <div class="col-md-8">
                             <h5 class="fw-bold">Thông tin cá nhân</h5>
-                            <div class="mb-3">
-                                <label for="name" class="form-label">Họ và tên</label>
-                                <input type="name" name="name" class="form-control" id="name" disabled>
-                            </div>
-                            <div class="mb-3">
-                                <label for="userName" class="form-label">Tài khoản:</label>
-                                <input type="text" name="username" class="form-control" id="userName" value=""
-                                       disabled>
-                            </div>
-                            <div class="mb-3">
-                                <label for="userEmail" class="form-label">Email:</label>
-                                <input type="email" name="email" class="form-control" id="userEmail" value=""
-                                       disabled>
-                            </div>
-                            <div class="mb-3">
-                                <label for="position" class="form-label">Chức vụ:</label>
-                                <input type="position" name="role" class="form-control" id="position" value=""
-                                       disabled>
-                            </div>
-                            <div class="mb-3">
-                                <label for="userGender" class="form-label">Giới tính:</label>
-                                <select class="form-select" id="userGender" disabled>
-                                    <option value="male">nam</option>
-                                    <option value="female">nữ</option>
-                                    <option value="other">khác</option>
-                                </select>
-                            </div>
-
-                            <button onclick=""
-                                    class="btn w-100 text-white hover-underline-center" style="background: #384AD5;">Chỉnh sửa thông tin
-                            </button>
+                            <form action="{{ url_for('update_account') }}" method="POST" id="account-form">
+                                <div class="mb-3">
+                                    <label for="name" class="form-label">Họ và tên</label>
+                                    <input type="name" name="name" class="form-control" id="name"
+                                           value="{{ current_user.name }}" disabled>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="userName" class="form-label">Tài khoản:</label>
+                                    <input type="text" name="username" class="form-control" id="userName"
+                                           value="{{ current_user.username }}" disabled>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="userEmail" class="form-label">Email:</label>
+                                    <input type="email" name="email" class="form-control" id="userEmail"
+                                           value="{{ current_user.email }}"
+                                           disabled>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="position" class="form-label">Chức vụ:</label>
+                                    <input type="position" name="role" class="form-control" id="position"
+                                           value="{% if current_user.role.name == 'ADMIN' %}Quản trị viên{% else %}Học sinh{% endif %}"
+                                           disabled>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="userGender" class="form-label">Giới tính:</label>
+                                    <select class="form-select" id="userGender" disabled>
+                                        <option value="Male" {% if user.gender==
+                                        'Male' %}selected{% endif %}>Nam</option>
+                                        <option value="Female" {% if user.gender==
+                                        'Female' %}selected{% endif %}>Nữ</option>
+                                    </select>
+                                </div>
+                                <div class="d-grid gap-2">
+                                    <button type="button" id="edit-btn"
+                                            class="btn w-100 text-white hover-underline-center"
+                                            style="background: #384AD5;" onclick="toggleEdit()">
+                                        Chỉnh sửa thông tin
+                                    </button>
+                                    <div id="action-buttons" style="display: none;">
+                                        <button type="submit" class="btn btn-success w-100 mb-2 text-white hover-underline-center">Lưu thay đổi</button>
+                                        <button type="button" class="btn btn-danger w-100 text-white hover-underline-center" onclick="cancelEdit()">
+                                            Hủy
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>

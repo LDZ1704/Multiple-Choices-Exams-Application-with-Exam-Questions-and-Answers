@@ -14,10 +14,16 @@
                 <p><i class="bi bi-journal-richtext"></i> Khám phá kho đề thi khổng lồ giúp bạn học tập hiệu quả hơn.
                 </p>
 
-                <div class="input-group mt-4">
-                    <input type="text" class="form-control" placeholder="Tìm kiếm đề thi...">
-                    <button class="btn btn-primary" style="background-color: #384AD5"><i class="bi bi-search"></i></button>
-                </div>
+                <form method="GET" action="{{ url_for('index') }}" class="mt-4 mb-4">
+                    <div class="input-group">
+                        <input type="text" name="search" class="form-control"
+                               placeholder="Tìm kiếm đề thi..."
+                               value="{{ search_query if search_query else '' }}">
+                        <button class="btn btn-primary" type="submit" style="background-color: #384AD5">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                </form>
             </div>
 
             <!-- Slider -->
@@ -56,58 +62,131 @@
 <section class="py-5">
     <div class="container">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h4 class="fw-bold">Đề thi</h4>
+            <h4 class="fw-bold fs-2">Các đề thi mới nhất
+                {% if search_query %}
+                <small class="text-muted">(Kết quả tìm kiếm: "{{ search_query }}")</small>
+                {% endif %}
+            </h4>
+            {% if search_query %}
+            <a href="{{ url_for('index') }}"
+               class="btn btn-outline-danger d-flex align-items-center"
+               title="Xóa bộ lọc tìm kiếm">
+                <i class="bi bi-x-circle-fill me-1"></i>
+                <span class="d-none d-md-inline">Xóa tìm kiếm</span>
+                <span class="d-md-none">Xóa</span>
+            </a>
+            {% endif %}
         </div>
+
+        {% if exams %}
         <div class="row g-4">
-            <!-- Card 1 -->
-            <div class="col-md-3">
-                <div class="card">
+            {% for exam_data in exams %}
+            {% set exam = exam_data.exam %}
+            {% set stats = exam_data.stats %}
+            {% set question_count = exam_data.question_count %}
+
+            <div class="col-md-4">
+                <div class="card h-100 exam-card">
                     <img src="{{ url_for('static', filename='images/demo.png') }}" class="card-img-top">
-                    <div class="card-body">
-                        <h6 class="card-title">Tên đề thi</h6>
-                        <p class="text-muted mb-1">10/07/2025</p>
-                        <p><i class="bi bi-eye"></i> 0 &nbsp; <i class="bi bi-chat-left"></i> 0</p>
-                        <button type="submit" class="btn w-100 fs-5 text-white hover-underline-center" style="background: #384AD5;"><a href="/examdetail" class="text-white text-decoration-none">Vào đề thi</a></button>
+                    <div class="card-body d-flex flex-column">
+                        <h6 class="card-title fs-5">{{ exam.exam_name }}</h6>
+                        <p class="text-muted mb-1">
+                            <i class="bi bi-calendar"></i>
+                            {{ exam.createAt.strftime('%d/%m/%Y') }}
+                        </p>
+                        <p class="text-muted mb-1">
+                            <i class="bi bi-book"></i>
+                            {{ exam.subject.subject_name }}
+                        </p>
+                        <p class="text-muted mb-2">
+                            <i class="bi bi-clock"></i>
+                            {{ exam.duration }} phút
+                            &nbsp;&nbsp;
+                            <i class="bi bi-question-circle"></i>
+                            {{ question_count }} câu hỏi
+                        </p>
+                        <p class="mb-3">
+                            <i class="bi bi-eye"></i> {{ stats.total_attempts }} lượt làm
+                            {% if stats.total_attempts > 0 %}
+                            &nbsp;&nbsp;
+                            <i class="bi bi-star"></i>
+                            {{ stats.avg_score }}/100
+                            {% endif %}
+                        </p>
+                        <div class="mt-auto">
+                            <a href="{{ url_for('exam_detail') }}?id={{ exam.id }}"
+                               class="btn w-100 fs-6 text-white hover-underline-center"
+                               style="background: #384AD5;">
+                                Vào đề thi
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
-            <!-- Card 2 -->
-            <div class="col-md-3">
-                <div class="card">
-                    <img src="{{ url_for('static', filename='images/demo.png') }}" class="card-img-top">
-                    <div class="card-body">
-                        <h6 class="card-title">Tên đề thi</h6>
-                        <p class="text-muted mb-1">10/07/2025</p>
-                        <p><i class="bi bi-eye"></i> 0 &nbsp; <i class="bi bi-chat-left"></i> 0</p>
-                        <button type="submit" class="btn w-100 fs-5 text-white hover-underline-center" style="background: #384AD5;"><a href="/examdetail" class="text-white text-decoration-none">Vào đề thi</a></button>
-                    </div>
-                </div>
-            </div>
-            <!-- Card 3 -->
-            <div class="col-md-3">
-                <div class="card">
-                    <img src="{{ url_for('static', filename='images/demo.png') }}" class="card-img-top">
-                    <div class="card-body">
-                        <h6 class="card-title">Tên đề thi</h6>
-                        <p class="text-muted mb-1">10/07/2025</p>
-                        <p><i class="bi bi-eye"></i> 0 &nbsp; <i class="bi bi-chat-left"></i> 0</p>
-                        <button type="submit" class="btn w-100 fs-5 text-white hover-underline-center" style="background: #384AD5;"><a href="/examdetail" class="text-white text-decoration-none">Vào đề thi</a></button>
-                    </div>
-                </div>
-            </div>
-            <!-- Card 4 -->
-            <div class="col-md-3">
-                <div class="card">
-                    <img src="{{ url_for('static', filename='images/demo.png') }}" class="card-img-top">
-                    <div class="card-body">
-                        <h6 class="card-title">Tên đề thi</h6>
-                        <p class="text-muted mb-1">10/07/2025</p>
-                        <p><i class="bi bi-eye"></i> 0 &nbsp; <i class="bi bi-chat-left"></i> 0</p>
-                        <button type="submit" class="btn w-100 fs-5 text-white hover-underline-center" style="background: #384AD5;"><a href="/examdetail" class="text-white text-decoration-none">Vào đề thi</a></button>
-                    </div>
-                </div>
-            </div>
+            {% endfor %}
         </div>
+
+        <!-- Phân trang -->
+        {% if pagination.pages > 1 %}
+        <nav aria-label="Page navigation" class="mt-4" id="pagination-section">
+            <ul class="pagination justify-content-end">
+                {% if pagination.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('index', page=pagination.prev_num, search=search_query) }}">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
+                </li>
+                {% endif %}
+
+                {% for page_num in pagination.iter_pages() %}
+                {% if page_num %}
+                {% if page_num != pagination.page %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('index', page=page_num, search=search_query) }}">
+                        {{ page_num }}
+                    </a>
+                </li>
+                {% else %}
+                <li class="page-item active">
+                    <span class="page-link">{{ page_num }}</span>
+                </li>
+                {% endif %}
+                {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                </li>
+                {% endif %}
+                {% endfor %}
+
+                {% if pagination.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('index', page=pagination.next_num, search=search_query) }}">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-search display-1 text-muted"></i>
+            <h5 class="mt-3">
+                {% if search_query %}
+                Không tìm thấy đề thi nào phù hợp
+                {% else %}
+                Chưa có đề thi nào
+                {% endif %}
+            </h5>
+            <p class="text-muted">
+                {% if search_query %}
+                Hãy thử tìm kiếm với từ khóa khác
+                {% else %}
+                Các đề thi sẽ được hiển thị tại đây
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
     </div>
 </section>
 {% endblock %}

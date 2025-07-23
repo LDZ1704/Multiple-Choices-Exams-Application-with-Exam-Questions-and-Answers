@@ -3,60 +3,137 @@
 {% block content %}
 <section class="py-5">
     <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h4 class="fw-bold">Môn 1</h4>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="fw-bold text-primary fs-1">Danh sách các môn học</h2>
         </div>
-        <div class="row g-4">
-            <!-- Card 1 -->
-            <div class="col-md-3">
-                <div class="card">
-                    <img src="{{ url_for('static', filename='images/demo.png') }}" class="card-img-top">
-                    <div class="card-body">
-                        <h6 class="card-title">Tên đề thi</h6>
-                        <p class="text-muted mb-1">10/07/2025</p>
-                        <p><i class="bi bi-eye"></i> 0 &nbsp; <i class="bi bi-chat-left"></i> 0</p>
-                        <button type="submit" class="btn w-100 fs-5 text-white hover-underline-center" style="background: #384AD5;"><a href="/examdetail" class="text-white text-decoration-none">Vào đề thi</a></button>
+
+        <!-- Search Form -->
+        <div class="row mb-4">
+            <div class="col-md-8 mx-auto">
+                <form method="GET" action="{{ url_for('subjects') }}" class="d-flex">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light">
+                            <i class="bi bi-search text-muted"></i>
+                        </span>
+                        <input type="text"
+                               class="form-control form-control-lg"
+                               name="search"
+                               value="{{ search_query }}"
+                               placeholder="Tìm kiếm theo tên môn học hoặc tên đề thi..."
+                               autocomplete="off">
+                        <button class="btn btn-primary hover-underline-center" type="submit"
+                                style="background: #384AD5; border-color: #384AD5;">
+                            <i class="bi bi-search me-1"></i>Tìm kiếm
+                        </button>
+                        {% if search_query %}
+                        <a href="{{ url_for('subjects') }}"
+                           class="btn btn-outline-danger d-flex align-items-center"
+                           title="Xóa bộ lọc tìm kiếm">
+                            <i class="bi bi-x-circle-fill me-1"></i>
+                            <span class="d-none d-md-inline">Xóa tìm kiếm</span>
+                            <span class="d-md-none">Xóa</span>
+                        </a>
+                        {% endif %}
                     </div>
-                </div>
-            </div>
-            <!-- Card 2 -->
-            <div class="col-md-3">
-                <div class="card">
-                    <img src="{{ url_for('static', filename='images/demo.png') }}" class="card-img-top">
-                    <div class="card-body">
-                        <h6 class="card-title">Tên đề thi</h6>
-                        <p class="text-muted mb-1">10/07/2025</p>
-                        <p><i class="bi bi-eye"></i> 0 &nbsp; <i class="bi bi-chat-left"></i> 0</p>
-                        <button type="submit" class="btn w-100 fs-5 text-white hover-underline-center" style="background: #384AD5;"><a href="/examdetail" class="text-white text-decoration-none">Vào đề thi</a></button>
-                    </div>
-                </div>
-            </div>
-            <!-- Card 3 -->
-            <div class="col-md-3">
-                <div class="card">
-                    <img src="{{ url_for('static', filename='images/demo.png') }}" class="card-img-top">
-                    <div class="card-body">
-                        <h6 class="card-title">Tên đề thi</h6>
-                        <p class="text-muted mb-1">10/07/2025</p>
-                        <p><i class="bi bi-eye"></i> 0 &nbsp; <i class="bi bi-chat-left"></i> 0</p>
-                        <button type="submit" class="btn w-100 fs-5 text-white hover-underline-center" style="background: #384AD5;"><a href="/examdetail" class="text-white text-decoration-none">Vào đề thi</a></button>
-                    </div>
-                </div>
-            </div>
-            <!-- Card 4 -->
-            <div class="col-md-3">
-                <div class="card">
-                    <img src="{{ url_for('static', filename='images/demo.png') }}" class="card-img-top">
-                    <div class="card-body">
-                        <h6 class="card-title">Tên đề thi</h6>
-                        <p class="text-muted mb-1">10/07/2025</p>
-                        <p><i class="bi bi-eye"></i> 0 &nbsp; <i class="bi bi-chat-left"></i> 0</p>
-                        <button type="submit" class="btn w-100 fs-5 text-white hover-underline-center" style="background: #384AD5;"><a href="/examdetail" class="text-white text-decoration-none">Vào đề thi</a></button>
-                    </div>
-                </div>
+                </form>
             </div>
         </div>
+
+        <!-- Search Results Info -->
+        {% if search_query %}
+        <div class="alert alert-info d-flex align-items-center mb-4">
+            <i class="bi bi-info-circle me-2"></i>
+            <div>
+                Kết quả tìm kiếm cho: <strong>"{{ search_query }}"</strong>
+                {% if subjects_with_exams %}
+                - Tìm thấy trong {{ subjects_with_exams|length }} môn học
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if subjects_with_exams %}
+        {% for subject_data in subjects_with_exams %}
+        <div class="mb-5">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="fw-bold text-black">
+                    {{ subject_data.subject.subject_name }}:
+                    <span class="badge bg-info text-dark ms-2 fs-5">{{ subject_data.exam_count }} đề thi</span>
+                </h4>
+            </div>
+
+            {% if subject_data.exams %}
+            <div class="row g-4">
+                {% for exam_data in subject_data.exams %}
+                <div class="col-md-3">
+                    <div class="card h-100 shadow-sm hover-card">
+                        <img src="{{ exam_data.exam.thumbnail or url_for('static', filename='images/demo.png') }}"
+                             class="card-img-top">
+                        <div class="card-body d-flex flex-column">
+                            <h6 class="card-title fw-bold">{{ exam_data.exam.exam_name }}</h6>
+                            <p class="text-muted mb-2">
+                                <i class="bi bi-calendar3"></i>
+                                {{ exam_data.exam.createAt.strftime('%d/%m/%Y') }}
+                            </p>
+                            <p class="text-muted mb-2">
+                                <i class="bi bi-question-circle"></i>
+                                {{ exam_data.question_count }} câu hỏi
+                            </p>
+                            <p class="text-muted mb-3">
+                                <i class="bi bi-people"></i> {{ exam_data.stats.total_attempts }} lượt thi
+                                &nbsp;
+                                <i class="bi bi-star"></i> {{ exam_data.stats.avg_score }}/100
+                            </p>
+
+                            {% if exam_data.exam.description %}
+                            <p class="card-text text-muted small mb-3">
+                                {{ exam_data.exam.description[:100] }}{% if exam_data.exam.description|length > 100
+                                %}...{% endif %}
+                            </p>
+                            {% endif %}
+
+                            <div class="mt-auto">
+                                <button type="button" class="btn w-100 fs-6 text-white hover-underline-center"
+                                        style="background: #384AD5;">
+                                    <a href="{{ url_for('exam_detail', id=exam_data.exam.id) }}"
+                                       class="text-white text-decoration-none">
+                                        <i class="bi bi-play-circle me-1"></i>Vào đề thi
+                                    </a>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-journal-x text-muted" style="font-size: 3rem;"></i>
+                <p class="text-muted mt-3">Chưa có đề thi nào cho môn học này</p>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if not loop.last %}
+        <hr class="my-5">
+        {% endif %}
+        {% endfor %}
+        {% else %}
+        <div class="text-center py-5">
+            {% if search_query %}
+            <i class="bi bi-search text-muted" style="font-size: 4rem;"></i>
+            <h4 class="text-muted mt-3">Không tìm thấy kết quả</h4>
+            <p class="text-muted">Không có môn học hoặc đề thi nào phù hợp với từ khóa "{{ search_query }}"</p>
+            <a href="{{ url_for('subjects') }}" class="btn btn-primary mt-3 hover-underline-center" style="background: #384AD5;">
+                <i class="bi bi-arrow-left me-1"></i>Xem tất cả môn học
+            </a>
+            {% else %}
+            <i class="bi bi-book text-muted" style="font-size: 4rem;"></i>
+            <h4 class="text-muted mt-3">Chưa có môn học nào</h4>
+            <p class="text-muted">Hệ thống chưa có dữ liệu môn học để hiển thị</p>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 </section>
-
 {% endblock %}
