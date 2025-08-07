@@ -7,19 +7,15 @@
             <div class="col-md-6">
                 <span class="badge mb-2" style="background-color: #384AD5">Hiệu quả</span>
                 <h2 class="fw-bold">Học tập <span style="color: #384AD5">mọi lúc mọi nơi</span></h2>
-                <p><i class="bi bi-wifi"></i> Bất kể bạn đang ở đâu, chỉ cần có thiết bị kết nối internet, bạn đều có
-                    thể học tập.</p>
-                <p><i class="bi bi-phone"></i> Bạn có thể học trên điện thoại thông minh, máy tính bảng, laptop hoặc máy
-                    tính để bàn.</p>
+                <p><i class="bi bi-wifi"></i> Bất kể bạn đang ở đâu, chỉ cần có thiết bị kết nối internet, bạn đều có thể học tập.</p>
+                <p><i class="bi bi-phone"></i> Bạn có thể học trên điện thoại thông minh, máy tính bảng, laptop hoặc máy tính để bàn.</p>
                 <p><i class="bi bi-journal-richtext"></i> Khám phá kho đề thi khổng lồ giúp bạn học tập hiệu quả hơn.
                 </p>
 
                 <form method="GET" action="{{ url_for('index') }}" class="mt-4 mb-4">
                     <div class="input-group">
-                        <input type="text" name="search" class="form-control"
-                               placeholder="Tìm kiếm đề thi..."
-                               value="{{ search_query if search_query else '' }}">
-                        <button class="btn btn-primary" type="submit" style="background-color: #384AD5">
+                        <input type="text" name="search" class="form-control" placeholder="Tìm kiếm đề thi..." value="{{ search_query if search_query else '' }}">
+                        <button class="btn btn-primary hover-underline-center" type="submit" style="background-color: #384AD5">
                             <i class="bi bi-search"></i>
                         </button>
                     </div>

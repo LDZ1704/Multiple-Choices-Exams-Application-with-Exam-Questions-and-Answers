@@ -1,0 +1,271 @@
+{% extends 'layout/base.html' %}
+
+{% block content %}
+<section class="py-5">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold fs-1 text-primary">Đề thi đã tạo
+                {% if search_query %}
+                <small class="text-muted">(Kết quả tìm kiếm: "{{ search_query }}")</small>
+                {% endif %}
+            </h4>
+            <div class="d-flex gap-2">
+                {% if search_query %}
+                <a href="{{ url_for('user_exams') }}"
+                   class="btn btn-outline-danger d-flex align-items-center"
+                   title="Xóa bộ lọc tìm kiếm">
+                    <i class="bi bi-x-circle-fill me-1"></i>
+                    <span class="d-none d-md-inline">Xóa tìm kiếm</span>
+                </a>
+                {% endif %}
+                <div class="btn-group">
+                    <button type="button" class="btn btn-primary dropdown-toggle"
+                            data-bs-toggle="dropdown" aria-expanded="false"
+                            style="background: #384AD5;">
+                        <i class="bi bi-plus-circle me-1"></i>
+                        Tạo đề thi
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a class="dropdown-item" href="{{ url_for('create_exam') }}">
+                                <i class="bi bi-pencil me-2"></i>
+                                Tạo đề thi thủ công
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="{{ url_for('create_random_exam') }}">
+                                <i class="bi bi-magic me-2"></i>
+                                Tạo đề thi ngẫu nhiên
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tìm kiếm -->
+        <form method="GET" action="{{ url_for('user_exams') }}" class="mb-4">
+            <div class="input-group">
+                <input type="text" name="search" class="form-control"
+                       placeholder="Tìm kiếm đề thi..."
+                       value="{{ search_query if search_query else '' }}">
+                <button class="btn btn-primary" type="submit" style="background-color: #384AD5">
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
+        </form>
+
+        {% if exams %}
+        <div class="row g-4">
+            {% for exam_data in exams %}
+            {% set exam = exam_data.exam %}
+            {% set stats = exam_data.stats %}
+            {% set question_count = exam_data.question_count %}
+
+            <div class="col-md-4">
+                <div class="card h-100 exam-card position-relative">
+                    <img src="{{ url_for('static', filename='images/demo.png') }}" class="card-img-top">
+
+                    <!-- Dropdown menu -->
+                    <div class="dropdown position-absolute" style="top: 10px; right: 10px;">
+                        <button class="btn btn-sm btn-primary dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('edit_exam', exam_id=exam.id) }}">
+                                    <i class="bi bi-pencil me-2"></i>Chỉnh sửa
+                                </a>
+                            </li>
+                            <li>
+                                <button class="dropdown-item text-danger"
+                                        onclick="confirmDelete({{ exam.id }}, '{{ exam.exam_name }}')">
+                                    <i class="bi bi-trash me-2"></i>Xóa
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="card-body d-flex flex-column">
+                        <h6 class="card-title fs-5">{{ exam.exam_name }}</h6>
+                        <p class="text-muted mb-1">
+                            <i class="bi bi-calendar"></i>
+                            {{ exam.createAt.strftime('%d/%m/%Y') }}
+                        </p>
+                        <p class="text-muted mb-1">
+                            <i class="bi bi-book"></i>
+                            {{ exam.subject.subject_name }}
+                        </p>
+                        <p class="text-muted mb-2">
+                            <i class="bi bi-clock"></i>
+                            {{ exam.duration }} phút
+                            &nbsp;&nbsp;
+                            <i class="bi bi-question-circle"></i>
+                            {{ question_count }} câu hỏi
+                        </p>
+                        <p class="mb-3">
+                            <i class="bi bi-eye"></i> {{ stats.total_attempts }} lượt làm
+                            {% if stats.total_attempts > 0 %}
+                            &nbsp;&nbsp;
+                            <i class="bi bi-star"></i>
+                            {{ stats.avg_score }}/100
+                            {% endif %}
+                        </p>
+                        <div class="mt-auto">
+                            <a href="{{ url_for('exam_detail') }}?id={{ exam.id }}"
+                               class="btn w-100 fs-6 text-white hover-underline-center"
+                               style="background: #384AD5;">
+                                Vào đề thi
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Phân trang -->
+        {% if pagination.pages > 1 %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-end">
+                {% if pagination.has_prev %}
+                <li class="page-item">
+                    <a class="page-link"
+                       href="{{ url_for('user_exams', page=pagination.prev_num, search=search_query) }}">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
+                </li>
+                {% endif %}
+
+                {% for page_num in pagination.iter_pages() %}
+                {% if page_num %}
+                {% if page_num != pagination.page %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('user_exams', page=page_num, search=search_query) }}">
+                        {{ page_num }}
+                    </a>
+                </li>
+                {% else %}
+                <li class="page-item active">
+                    <span class="page-link">{{ page_num }}</span>
+                </li>
+                {% endif %}
+                {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                </li>
+                {% endif %}
+                {% endfor %}
+
+                {% if pagination.has_next %}
+                <li class="page-item">
+                    <a class="page-link"
+                       href="{{ url_for('user_exams', page=pagination.next_num, search=search_query) }}">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-file-earmark-plus display-1 text-muted"></i>
+            <h5 class="mt-3">
+                {% if search_query %}
+                Không tìm thấy đề thi nào phù hợp
+                {% else %}
+                Bạn chưa tạo đề thi nào
+                {% endif %}
+            </h5>
+            <p class="text-muted mb-4">
+                {% if search_query %}
+                Hãy thử tìm kiếm với từ khóa khác
+                {% else %}
+                Hãy tạo đề thi đầu tiên của bạn
+                {% endif %}
+            </p>
+            {% if not search_query %}
+            <a href="{{ url_for('create_exam') }}" class="btn btn-primary hover-underline-center"
+               style="background: #384AD5;">
+                <i class="bi bi-plus-circle me-1"></i>
+                Tạo đề thi mới
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- Modal xác nhận xóa -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
+            <!-- Header với gradient đỏ -->
+            <div class="modal-header border-0 text-white position-relative"
+                 style="background: linear-gradient(135deg, #dc3545, #c82333); padding: 1.5rem 2rem;">
+                <div class="d-flex align-items-center">
+                    <div class="bg-white bg-opacity-20 rounded-circle p-2 me-3">
+                        <i class="bi bi-exclamation-triangle-fill fs-4 text-dark"></i>
+                    </div>
+                    <h5 class="modal-title mb-0 fw-bold">Xác nhận xóa đề thi</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white opacity-75"
+                        data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <!-- Body với icon và nội dung -->
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <div class="bg-danger bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center"
+                         style="width: 80px; height: 80px;">
+                        <i class="bi bi-trash3-fill text-white" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <p class="fs-5 mb-3">
+                        Bạn có chắc chắn muốn xóa đề thi
+                        <span class="fw-bold text-primary" id="examNameToDelete"></span>?
+                    </p>
+
+                    <div class="alert alert-warning border-0 bg-warning bg-opacity-10" role="alert">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-info-circle-fill text-danger me-2"></i>
+                            <small class="text-danger mb-0">
+                                <strong>Lưu ý:</strong> Thao tác này không thể hoàn tác và sẽ xóa tất cả kết quả thi
+                                liên quan.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer với buttons đẹp -->
+            <div class="modal-footer border-0 bg-light bg-opacity-50 p-4">
+                <button type="button" class="btn btn-outline-secondary px-4 py-2 rounded-pill me-2"
+                        data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-1"></i>Hủy bỏ
+                </button>
+                <form id="deleteForm" method="POST" style="display: inline;">
+                    <button type="submit"
+                            class="btn btn-danger px-4 py-2 rounded-pill position-relative overflow-hidden">
+                        <span class="position-relative">
+                            <i class="bi bi-trash3 me-1"></i>Xóa đề thi
+                        </span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function confirmDelete(examId, examName) {
+        document.getElementById('examNameToDelete').textContent = examName;
+        document.getElementById('deleteForm').action = `/delete-exam/${examId}`;
+        new bootstrap.Modal(document.getElementById('deleteModal')).show();
+    }
+</script>
+{% endblock %}

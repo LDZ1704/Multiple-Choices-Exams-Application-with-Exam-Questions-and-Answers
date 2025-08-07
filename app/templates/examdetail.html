@@ -62,31 +62,88 @@
         <div class="col-md-3 text-center">
             <div class="mb-2 fw-bold">Chia sẻ đề thi</div>
             <div class="d-flex justify-content-center mb-3">
-                <a href="#" class="btn btn-outline-primary btn-sm me-1"><i class="bi bi-facebook"></i></a>
-                <a href="#" class="btn btn-outline-info btn-sm me-1"><i class="bi bi-linkedin"></i></a>
-                <a href="#" class="btn btn-outline-dark btn-sm"><i class="bi bi-x"></i></a>
+                <a href="#" class="btn btn-outline-primary btn-sm me-1 hover-underline-center"><i class="bi bi-facebook"></i></a>
+                <a href="#" class="btn btn-outline-info btn-sm me-1 hover-underline-center"><i class="bi bi-linkedin"></i></a>
+                <a href="#" class="btn btn-outline-dark btn-sm hover-underline-center"><i class="bi bi-x"></i></a>
             </div>
             <div class="d-flex justify-content-center mb-3">------------------- Hoặc -------------------</div>
             <div class="d-grid gap-2 mb-2">
-                <button class="btn btn-outline-secondary btn-sm" onclick="copyToClipboard()">
+                <button class="btn btn-outline-secondary btn-sm hover-underline-center" onclick="copyToClipboard()">
                     <i class="bi bi-link-45deg"></i> Sao chép link
                 </button>
-                <button class="btn btn-outline-primary btn-sm"><i class="bi bi-qr-code-scan"></i> Quét mã QR</button>
+                <button class="btn btn-outline-primary btn-sm hover-underline-center"><i class="bi bi-qr-code-scan"></i> Quét mã QR</button>
             </div>
         </div>
     </div>
     <div class="row mt-4">
         <div class="col-md-12 d-grid">
             {% if current_user.is_authenticated %}
-            <a href="{{ url_for('doing_exam', exam_id=exam.id) }}"
-               class="btn fs-5 text-white text-decoration-none hover-underline-center" style="background: #384AD5;">
-                <i class="bi bi-play-circle"></i> Bắt đầu ôn thi
-            </a>
+                {% set student = current_user.student %}
+                {% if student %}
+                    {% set existing_session = dao.get_exam_session(student.id, exam.id) %}
+                    {% if existing_session and not existing_session.is_completed %}
+                        <div class="notification-box notification-danger mb-3" style="color: #f0ad4e;">
+                            <div class="notification-content">
+                                <i class="fas fa-clock notification-icon"></i>
+                                <div class="notification-text">
+                                    <strong>Bạn có bài thi chưa hoàn thành!</strong>
+                                    <div class="small">
+                                        Câu đã làm: {{ existing_session.user_answers|length if existing_session.user_answers else 0 }}/{{ question_count }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <a href="{{ url_for('doing_exam', exam_id=exam.id) }}" class="btn btn-warning btn-lg w-100 hover-underline-center d-flex align-items-center justify-content-center">
+                                    <i class="fas fa-play me-2"></i>Tiếp tục làm bài
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <button type="button" class="btn btn-outline-danger w-100 hover-underline-center d-flex align-items-center justify-content-center" onclick="confirmRestartExam()" style="height: 48px; font-size: 20px;">
+                                    <i class="fas fa-redo me-2"></i>Làm lại từ đầu
+                                </button>
+                            </div>
+                        </div>
+                    {% elif has_result %}
+                        <div class="notification-box notification-success mb-3" style="color: #155724;">
+                            <div class="notification-content">
+                                <i class="fas fa-check-circle notification-icon"></i>
+                                <div class="notification-text">
+                                    <strong>Bạn đã hoàn thành bài thi này!</strong>
+                                    <div class="small-text">Điểm số cao nhất: {{ highest_score }}/100</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                {% set latest_result = user_results[0] if user_results else None %}
+                                {% if latest_result %}
+                                    <a href="{{ url_for('view_exam_result', result_id=latest_result.id) }}"
+                                       class="btn btn-primary btn-lg w-100 hover-underline-center" style="background: #384AD5;">
+                                        <i class="fas fa-eye me-2"></i>Xem kết quả
+                                    </a>
+                                {% endif %}
+                            </div>
+                            <div class="col-6">
+                                <a href="{{ url_for('doing_exam', exam_id=exam.id) }}"
+                                   class="btn btn-outline-primary btn-lg w-100 hover-underline-center">
+                                    <i class="fas fa-redo me-2"></i>Bắt đầu ôn thi lại
+                                </a>
+                            </div>
+                        </div>
+                    {% else %}
+                        <a href="{{ url_for('doing_exam', exam_id=exam.id) }}"
+                           class="btn fs-5 text-white text-decoration-none hover-underline-center mb-3" style="background: #384AD5;">
+                            <i class="bi bi-play-circle"></i> Bắt đầu ôn thi
+                        </a>
+                    {% endif %}
+                {% endif %}
             {% else %}
-            <a href="{{ url_for('login', next=url_for('doing_exam', exam_id=exam.id)) }}"
-               class="btn fs-5 text-white text-decoration-none hover-underline-center" style="background: #384AD5;">
-                <i class="bi bi-play-circle"></i> Bắt đầu ôn thi
-            </a>
+                <a href="{{ url_for('login', next=url_for('exam_detail', id=exam.id)) }}"
+                   class="btn fs-5 text-white text-decoration-none hover-underline-center mb-3" style="background: #384AD5;">
+                    <i class="bi bi-play-circle"></i> Bắt đầu ôn thi
+                </a>
             {% endif %}
         </div>
     </div>
@@ -133,7 +190,7 @@
                                     <textarea class="form-control" name="content" rows="3"
                                               placeholder="Chia sẻ cảm nhận của bạn về đề thi này..."></textarea>
                                 </div>
-                                <button type="submit" class="btn btn-primary" style="background-color: #384AD5;">Gửi bình luận</button>
+                                <button type="submit" class="btn btn-primary hover-underline-center" style="background-color: #384AD5;">Gửi bình luận</button>
                             </form>
                         </div>
                     </div>
@@ -142,7 +199,7 @@
                         <div class="notification-content">
                             <i class="bi bi-info-circle notification-icon"></i>
                             <div class="notification-text">
-                                <a href="{{ url_for('login', next=url_for('exam_detail', exam_id=exam.id)) }}" class="login-link">Đăng nhập</a>
+                                <a href="{{ url_for('login', next=url_for('exam_detail', id=exam.id)) }}" class="login-link">Đăng nhập</a>
                                 để viết đánh giá và xem kết quả ôn tập.
                             </div>
                         </div>
@@ -254,14 +311,14 @@
                             <tr>
                                 <td>{{ loop.revindex }}</td>
                                 <td>
-                                    <span class="badge {% if result.score >= 8 %}bg-success{% elif result.score >= 6.5 %}bg-warning{% else %}bg-danger{% endif %}">
+                                    <span class="badge {% if result.score >= 80 %}bg-success{% elif result.score >= 50 %}bg-warning{% else %}bg-danger{% endif %}">
                                         {{ result.score }}/100
                                     </span>
                                 </td>
                                 <td>{{ exam.duration }} phút</td>
                                 <td>{{ result.taken_exam.strftime('%H:%M %d/%m/%Y') }}</td>
                                 <td>
-                                    {% if result.score >= 5 %}
+                                    {% if result.score >= 50 %}
                                     <span class="text-success">Đạt</span>
                                     {% else %}
                                     <span class="text-danger">Không đạt</span>
@@ -330,5 +387,259 @@
         </div>
     </div>
 </div>
+
+<!-- Modal xác nhận làm lại lúc còn đang làm -->
+<div class="modal fade" id="restartExamModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-gradient text-white border-0"
+                 style="background: linear-gradient(135deg, #ff416c 0%, #ff4757 100%);">
+                <h5 class="modal-title fw-bold">
+                    <i class="fas fa-redo me-2"></i>Xác nhận làm lại từ đầu
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <i class="fas fa-exclamation-triangle text-danger fs-1 mb-3"></i>
+                    <h5 class="fw-bold">Bạn có chắc chắn muốn làm lại bài thi không?</h5>
+                    <p class="text-muted">Toàn bộ tiến trình hiện tại sẽ bị xóa và không thể khôi phục.</p>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="text-center p-3 bg-success bg-opacity-10 rounded-3">
+                            <i class="fas fa-check-circle text-white fs-3 mb-2"></i>
+                            <h3 class="mb-0 text-white fw-bold" id="restart-answered-count">0</h3>
+                            <small class="text-white">Câu đã làm</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-center p-3 bg-warning bg-opacity-10 rounded-3">
+                            <i class="fas fa-trash-alt text-danger fs-3 mb-2"></i>
+                            <h3 class="mb-0 text-danger fw-bold">SẼ MẤT</h3>
+                            <small class="text-danger">Tiến trình</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Thêm thông tin thời gian đã dùng (nếu có) -->
+                <div class="alert alert-warning mt-2">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-clock me-2"></i>
+                        <div>
+                            <strong>Thời gian đã làm bài:</strong>
+                            <span id="restart-time-used">0 phút</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Hủy
+                </button>
+                <button type="button" class="btn btn-danger rounded-pill px-4" data-exam-id="{{ exam.id }}" data-answered-count="{{ session.user_answers|length if session.user_answers else 0 }}" onclick="restartExam()">
+                    <i class="fas fa-redo me-2"></i>Làm lại từ đầu
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal xác nhận làm lại bài thi sau khi làm 1 lần -->
+<div class="modal fade" id="retakeExamModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-gradient text-white border-0"
+                 style="background: linear-gradient(135deg, #384AD5 0%, #5a67d8 100%);">
+                <h5 class="modal-title fw-bold">
+                    <i class="fas fa-redo me-2"></i>Bắt đầu ôn thi lại
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <i class="fas fa-question-circle text-primary fs-1 mb-3"></i>
+                    <h5 class="fw-bold">Bạn có muốn làm lại bài thi này không?</h5>
+                    <p class="text-muted">Bạn sẽ tạo một phiên thi mới và có thể cải thiện điểm số của mình.</p>
+                </div>
+
+                <div class="notification-box notification-info">
+                    <div class="notification-content">
+                        <i class="bi bi-info-circle notification-icon"></i>
+                        <div class="notification-text small-text">
+                            Điểm số cao nhất của bạn sẽ được lưu lại để so sánh.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Hủy
+                </button>
+                <button type="button" class="btn btn-primary rounded-pill px-4" onclick="retakeExam()" style="background: #384AD5;">
+                    <i class="fas fa-play me-2"></i>Bắt đầu làm bài
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const userAnswers = {{ (existing_session.user_answers | tojson) if existing_session and existing_session.user_answers else '{}' }};
+    window.sessionData = {
+        user_answers: userAnswers
+    };
+
+    function confirmRestartExam() {
+        updateRestartModalStats();
+
+        const modal = new bootstrap.Modal(document.getElementById('restartExamModal'));
+        modal.show();
+    }
+
+    function updateRestartModalStats() {
+        const answeredCount = (typeof userAnswers !== 'undefined' && userAnswers)
+            ? Object.keys(userAnswers).length
+            : (window.sessionData && window.sessionData.user_answers)
+                ? Object.keys(window.sessionData.user_answers).length
+                : 0;
+
+        document.getElementById('restart-answered-count').textContent = answeredCount;
+
+        const examDuration = {{ exam.duration }};
+
+        {% if session and session.start_time %}
+            const startTime = new Date('{{ session.start_time.isoformat() }}');
+            {% if session.is_paused and session.pause_time%}
+                const endTime = new Date('{{ session.pause_time.isoformat() }}');
+                const totalElapsedSeconds = Math.floor((endTime - startTime) / 1000);
+
+                const pausedDuration = {{ session.total_paused_duration or 0 }};
+                const actualUsedTime = Math.max(0, totalElapsedSeconds - pausedDuration);
+
+                const usedMinutes = Math.floor(actualUsedTime / 60);
+                const usedSeconds = actualUsedTime % 60;
+            {% else %}
+                const actualUsedTime = 0;
+            {% endif %}
+            let timeText = '';
+            if (usedMinutes > 0) {
+                timeText = `${usedMinutes} phút`;
+                if (usedSeconds > 0) {
+                    timeText += ` ${usedSeconds} giây`;
+                }
+            } else {
+                timeText = `${Math.max(0, usedSeconds)} giây`;
+            }
+            
+            document.getElementById('restart-time-used').textContent = timeText;
+
+            const timeAlert = document.querySelector('#restartExamModal .alert-warning');
+            if (timeAlert) {
+                timeAlert.style.display = 'block';
+            }
+        {% else %}
+            const timeAlert = document.querySelector('#restartExamModal .alert-warning');
+            if (timeAlert) {
+                timeAlert.style.display = 'none';
+            }
+        {% endif %}
+    }
+
+    function restartExam() {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('restartExamModal'));
+        modal.hide();
+
+        const examId = getExamId();
+
+        if (!examId) {
+            alert('Không thể xác định bài thi!');
+            return;
+        }
+
+        showLoadingOverlay('Đang reset bài thi...', 'Vui lòng đợi trong giây lát');
+
+        fetch(`/api/exam/${examId}/restart`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = `/doing-exam/${examId}?restart=1`;
+            } else {
+                showErrorOverlay('Lỗi: ' + (data.error || 'Không thể reset bài thi'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showErrorOverlay('Không thể kết nối tới máy chủ');
+        });
+    }
+
+    function getExamId() {
+        if (typeof examId !== 'undefined') return examId;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlExamId = urlParams.get('id') || urlParams.get('exam_id');
+        if (urlExamId) return urlExamId;
+
+        const pathMatch = window.location.pathname.match(/doing-exam\/(\d+)/);
+        if (pathMatch) return pathMatch[1];
+
+        const examElement = document.querySelector('[data-exam-id]');
+        if (examElement) return examElement.dataset.examId;
+
+        return null;
+    }
+
+    function showLoadingOverlay(title, message) {
+        const container = document.querySelector('.container-fluid') || document.body;
+        container.innerHTML = `
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">${title}</span>
+                </div>
+                <h4>${title}</h4>
+                <p class="text-muted">${message}</p>
+            </div>
+        `;
+    }
+
+    function showErrorOverlay(errorMessage) {
+        const container = document.querySelector('.container-fluid') || document.body;
+        container.innerHTML = `
+            <div class="alert alert-danger text-center py-5">
+                <i class="fas fa-exclamation-triangle fs-1 mb-3"></i>
+                <h4>${errorMessage}</h4>
+                <button class="btn btn-primary mt-3" onclick="window.location.reload()">
+                    <i class="fas fa-redo me-2"></i>Thử lại
+                </button>
+            </div>
+        `;
+    }
+
+    function confirmRetakeExam() {
+        const modal = new bootstrap.Modal(document.getElementById('retakeExamModal'));
+        modal.show();
+    }
+
+    function retakeExam() {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('retakeExamModal'));
+        modal.hide();
+
+        const examId = getExamId();
+
+        if (!examId) {
+            alert('Không thể xác định bài thi!');
+            return;
+        }
+
+        showLoadingOverlay('Đang khởi tạo bài thi mới...', 'Vui lòng đợi trong giây lát');
+
+        window.location.href = `/doing-exam/${examId}`;
+    }
+</script>
 
 {% endblock %}

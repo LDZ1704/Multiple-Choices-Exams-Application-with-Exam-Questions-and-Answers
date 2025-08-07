@@ -1,0 +1,226 @@
+{% extends 'layout/base.html' %}
+
+{% block content %}
+<section class="py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
+                    <!-- Header với gradient -->
+                    <div class="card-header border-0 text-white text-center py-4"
+                         style="background: linear-gradient(135deg, #384AD5, #5B6CF0);">
+                        <div class="bg-white bg-opacity-20 rounded-circle d-inline-flex align-items-center justify-content-center mb-3 text-dark"
+                             style="width: 80px; height: 80px;">
+                            <i class="bi bi-magic" style="font-size: 2.5rem;"></i>
+                        </div>
+                        <h3 class="fw-bold mb-2">Tạo Đề Thi Ngẫu Nhiên</h3>
+                        <p class="mb-0 opacity-90">Hệ thống sẽ tự động chọn câu hỏi ngẫu nhiên cho bạn</p>
+                    </div>
+
+                    <div class="card-body p-5">
+                        <form id="randomExamForm">
+                            <!-- Tên đề thi -->
+                            <div class="mb-4">
+                                <label for="exam_name" class="form-label fw-bold text-primary">
+                                    <i class="bi bi-file-earmark-text me-2"></i>Tên đề thi
+                                </label>
+                                <input type="text"
+                                       class="form-control form-control-lg border-2"
+                                       id="exam_name"
+                                       name="exam_name"
+                                       placeholder="Nhập tên đề thi..."
+                                       style="border-radius: 12px; border-color: #e0e7ff;"
+                                       required>
+                            </div>
+
+                            <!-- Môn học -->
+                            <div class="mb-4">
+                                <label for="subject_id" class="form-label fw-bold text-primary">
+                                    <i class="bi bi-book me-2"></i>Môn học
+                                </label>
+                                <select class="form-select form-select-lg border-2"
+                                        id="subject_id"
+                                        name="subject_id"
+                                        style="border-radius: 12px; border-color: #e0e7ff;"
+                                        required>
+                                    <option value="">Chọn môn học...</option>
+                                    {% for subject in subjects %}
+                                    <option value="{{ subject.id }}">{{ subject.subject_name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <div class="mt-2">
+                                    <small id="questionsInfo" class="text-muted"></small>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <!-- Số câu hỏi -->
+                                <div class="col-md-6 mb-4">
+                                    <label for="question_count" class="form-label fw-bold text-primary">
+                                        <i class="bi bi-list-ol me-2"></i>Số câu hỏi
+                                    </label>
+                                    <input type="number"
+                                           class="form-control form-control-lg border-2"
+                                           id="question_count"
+                                           name="question_count"
+                                           value="10"
+                                           min="1"
+                                           max="50"
+                                           style="border-radius: 12px; border-color: #e0e7ff;"
+                                           required>
+                                    <small class="text-muted">Từ 1 đến 50 câu hỏi</small>
+                                </div>
+
+                                <!-- Thời gian thi -->
+                                <div class="col-md-6 mb-4">
+                                    <label for="duration" class="form-label fw-bold text-primary">
+                                        <i class="bi bi-clock me-2"></i>Thời gian thi (phút)
+                                    </label>
+                                    <input type="number"
+                                           class="form-control form-control-lg border-2"
+                                           id="duration"
+                                           name="duration"
+                                           value="15"
+                                           min="1"
+                                           max="300"
+                                           style="border-radius: 12px; border-color: #e0e7ff;"
+                                           required>
+                                    <small class="text-muted">Từ 1 đến 300 phút</small>
+                                </div>
+                            </div>
+
+                            <!-- Thông tin bổ sung -->
+                            <div class="alert alert-info border-0 mb-4"
+                                 style="background: linear-gradient(135deg, #e3f2fd, #f3e5f5); border-radius: 12px;">
+                                <div class="d-flex align-items-start">
+                                    <i class="bi bi-info-circle-fill text-primary me-3 mt-1"></i>
+                                    <div>
+                                        <h6 class="fw-bold text-primary mb-2">Lưu ý quan trọng:</h6>
+                                        <ul class="mb-0 small text-primary">
+                                            <li>Hệ thống sẽ tự động chọn câu hỏi ngẫu nhiên từ ngân hàng câu hỏi của môn học</li>
+                                            <li>Mỗi câu hỏi sẽ bao gồm đầy đủ các đáp án và đáp án đúng</li>
+                                            <li>Bạn có thể chỉnh sửa đề thi sau khi tạo nếu cần thiết</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Buttons -->
+                            <div class="d-flex gap-3 justify-content-end">
+                                <a href="{{ url_for('user_exams') }}"
+                                   class="btn btn-outline-secondary btn-lg px-4 py-2"
+                                   style="border-radius: 12px;">
+                                    <i class="bi bi-arrow-left me-2"></i>Quay lại
+                                </a>
+
+                                <button type="submit"
+                                        class="btn btn-primary btn-lg px-4 py-2 position-relative"
+                                        style="background: linear-gradient(135deg, #384AD5, #5B6CF0); border: none; border-radius: 12px;"
+                                        id="submitBtn">
+                                    <span id="submitText">
+                                        <i class="bi bi-magic me-2"></i>Tạo đề thi ngẫu nhiên
+                                    </span>
+                                    <span id="loadingText" style="display: none;">
+                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                        Đang tạo...
+                                    </span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const subjectSelect = document.getElementById('subject_id');
+        const questionCountInput = document.getElementById('question_count');
+        const questionsInfo = document.getElementById('questionsInfo');
+        const form = document.getElementById('randomExamForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const submitText = document.getElementById('submitText');
+        const loadingText = document.getElementById('loadingText');
+
+        subjectSelect.addEventListener('change', function() {
+            const subjectId = this.value;
+            if (subjectId) {
+                fetch(`/api/subject/${subjectId}/questions-count`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            questionsInfo.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Có sẵn <strong>${data.count}</strong> câu hỏi trong môn học này`;
+                            questionCountInput.max = Math.min(50, data.count);
+
+                            if (parseInt(questionCountInput.value) > data.count) {
+                                questionCountInput.value = data.count;
+                            }
+                        } else {
+                            questionsInfo.innerHTML = '<i class="bi bi-exclamation-triangle text-warning me-1"></i>Không thể lấy thông tin câu hỏi';
+                        }
+                    })
+                    .catch(error => {
+                        questionsInfo.innerHTML = '<i class="bi bi-exclamation-triangle text-warning me-1"></i>Lỗi khi lấy thông tin';
+                    });
+            } else {
+                questionsInfo.innerHTML = '';
+            }
+        });
+
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(form);
+            const data = {
+                exam_name: formData.get('exam_name'),
+                subject_id: parseInt(formData.get('subject_id')),
+                duration: parseInt(formData.get('duration')),
+                question_count: parseInt(formData.get('question_count'))
+            };
+
+            //Validation
+            if (!data.exam_name || !data.subject_id || !data.duration) {
+                alert('Vui lòng điền đầy đủ thông tin!');
+                return;
+            }
+
+            if (data.question_count < 1) {
+                alert('Số câu hỏi phải lớn hơn 0!');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitText.style.display = 'none';
+            loadingText.style.display = 'inline';
+
+            fetch('/create-random-exam', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    alert(data.error || 'Có lỗi xảy ra khi tạo đề thi!');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Có lỗi xảy ra khi tạo đề thi!');
+            })
+            .finally(() => {
+                // Re-enable form
+                submitBtn.disabled = false;
+                submitText.style.display = 'inline';
+                loadingText.style.display = 'none';
+            });
+        });
+    });
+</script>
+{% endblock %}

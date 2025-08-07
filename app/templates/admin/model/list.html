@@ -1,0 +1,347 @@
+{% extends 'admin/master.html' %}
+{% import 'admin/lib.html' as lib with context %}
+{% import 'admin/static.html' as admin_static with context %}
+
+{% block body %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="page-title">{{ admin_view.name }}</h2>
+
+    <div class="d-flex gap-2">
+        {% if admin_view.can_create %}
+        <a href="{{ get_url('.create_view', url=return_url) }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>Thêm mới
+        </a>
+        {% endif %}
+
+        {% if actions %}
+        <div class="dropdown">
+            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="bi bi-three-dots me-2"></i>Thao tác
+            </button>
+            <ul class="dropdown-menu">
+                {% for p in actions %}
+                <li><a class="dropdown-item" href="javascript:void(0)" onclick="performAction('{{ p[0] }}')">{{ p[1] }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Search and Filters -->
+{% if search_supported or filters %}
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            {% if search_supported %}
+            <div class="col-md-4">
+                <form method="GET" action="{{ return_url }}">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="search" value="{{ search }}" placeholder="Tìm kiếm...">
+                        <button class="btn btn-outline-primary" type="submit">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                    {% for flt, flt_name, value in active_filters %}
+                    <input type="hidden" name="{{ flt }}" value="{{ value }}">
+                    {% endfor %}
+                </form>
+            </div>
+            {% endif %}
+
+            {% if filters %}
+            <div class="col-md-8">
+                <div class="d-flex gap-2 flex-wrap">
+                    {% for flt in filter_groups %}
+                    {% if flt.filters %}
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown">
+                            {{ flt.name }}
+                        </button>
+                        <ul class="dropdown-menu">
+                            {% for f in flt.filters %}
+                            <li><a class="dropdown-item" href="{{ f.url }}">{{ f.name }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if active_filters %}
+        <div class="mt-3">
+            <span class="text-muted me-2">Bộ lọc đang áp dụng:</span>
+            {% for flt, flt_name, value in active_filters %}
+            <span class="badge bg-secondary me-1">
+                        {{ flt_name }}: {{ value }}
+                        <a href="{{ get_filter_url(flt, None) }}" class="text-white ms-1">
+                            <i class="bi bi-x"></i>
+                        </a>
+                    </span>
+            {% endfor %}
+            <a href="{{ clear_search_url }}" class="btn btn-sm btn-outline-danger ms-2">
+                <i class="bi bi-x-circle me-1"></i>Xóa tất cả
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Data Table -->
+<div class="card">
+    <div class="card-body p-0">
+        {% if count %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                <tr>
+                    {% if actions %}
+                    <th width="20">
+                        <input type="checkbox" name="rowtoggle" class="action-rowtoggle" title="Chọn tất cả"/>
+                    </th>
+                    {% endif %}
+
+                    {% for c, name in list_columns %}
+                    <th class="column-header{% if sort_column and c in sort_column %} sorted{% endif %}">
+                        {% if admin_view.is_sortable(c) %}
+                        {% if sort_column %}
+                        <a href="{{ sort_url(c, True) }}" title="Sắp xếp theo {{ name }}">
+                            {{ name }}
+                            {% if sort_column and c in sort_column %}
+                            {% if sort_desc %}
+                            <i class="bi bi-arrow-down"></i>
+                            {% else %}
+                            <i class="bi bi-arrow-up"></i>
+                            {% endif %}
+                            {% endif %}
+                        </a>
+                        {% else %}
+                        <a href="{{ sort_url(c) }}" title="Sắp xếp theo {{ name }}">{{ name }}</a>
+                        {% endif %}
+                        {% else %}
+                        {{ name }}
+                        {% endif %}
+                    </th>
+                    {% endfor %}
+
+                    {% if admin_view.can_edit or admin_view.can_delete or admin_view.can_view_details %}
+                    <th class="text-end" width="120">Thao tác</th>
+                    {% endif %}
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in data %}
+                <tr>
+                    {% if actions %}
+                    <td>
+                        <input type="checkbox" name="rowid" class="action-checkbox" value="{{ get_pk_value(row) }}" title="Chọn bản ghi"/>
+                    </td>
+                    {% endif %}
+
+                    {% for c, name in list_columns %}
+                    <td>
+                        {% if admin_view.is_editable(c) %}
+                        {% if admin_view.can_edit %}
+                        <a href="{{ get_url('.edit_view', id=get_pk_value(row), url=return_url) }}">
+                            {{ get_value(row, c) }}
+                        </a>
+                        {% else %}
+                        {{ get_value(row, c) }}
+                        {% endif %}
+                        {% else %}
+                        {{ get_value(row, c) }}
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+
+                    {% if admin_view.can_edit or admin_view.can_delete or admin_view.can_view_details %}
+                    <td class="text-end">
+                        <div class="btn-group btn-group-sm" role="group">
+                            {% if admin_view.can_view_details %}
+                            <a href="{{ get_url('.details_view', id=get_pk_value(row), url=return_url) }}"
+                               class="btn btn-outline-primary"
+                               title="Xem chi tiết">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            {% endif %}
+
+                            {% if admin_view.can_edit %}
+                            <a href="{{ get_url('.edit_view', id=get_pk_value(row), url=return_url) }}"
+                               class="btn btn-outline-warning"
+                               title="Chỉnh sửa">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            {% endif %}
+
+                            {% if admin_view.can_delete %}
+                            <form style="display: inline;" method="POST" action="{{ get_url('.delete_view', id=get_pk_value(row), url=return_url) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa?')">
+                                <button type="submit" class="btn btn-outline-danger" title="Xóa">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if num_pages > 1 %}
+        <div class="card-footer bg-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="text-muted">
+                    {% if count > 0 %}
+                        {% set current_page = page|int if page|int > 0 else 1 %}
+                        {% set start_item = ((current_page - 1) * page_size|int) + 1 %}
+                        {% set end_item = start_item + page_size|int - 1 %}
+                        {% set end_item = end_item if end_item <= count|int else count|int %}
+                        Hiển thị {{ start_item }} - {{ end_item }} trong {{ count }} bản ghi
+                    {% else %}
+                        Hiển thị 0 bản ghi
+                    {% endif %}
+                </div>
+
+                <nav aria-label="Pagination">
+                    <ul class="pagination pagination-sm mb-0">
+                        {% if page > 1 %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ pager_url(page - 1) }}">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        {% for p in pager_range %}
+                        {% if p == page %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ p }}</span>
+                        </li>
+                        {% else %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ pager_url(p) }}">{{ p }}</a>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+
+                        {% if page < num_pages %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ pager_url(page + 1) }}">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="text-center p-5">
+            <i class="bi bi-inbox display-1 text-muted mb-4"></i>
+            <h4 class="text-muted">Không có dữ liệu</h4>
+            <p class="text-muted">
+                {% if search or active_filters %}
+                Không tìm thấy kết quả phù hợp với tiêu chí tìm kiếm.
+                {% else %}
+                Chưa có dữ liệu nào được thêm vào.
+                {% endif %}
+            </p>
+            {% if admin_view.can_create %}
+            <a href="{{ get_url('.create_view', url=return_url) }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-2"></i>Thêm bản ghi đầu tiên
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Actions Modal -->
+{% if actions %}
+<div class="modal fade" id="actions-modal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Xác nhận thao tác</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Bạn có chắc chắn muốn thực hiện thao tác này?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" id="actions-confirm">Xác nhận</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+    // Actions functionality
+    {% if actions %}
+        function performAction(name) {
+            var selected = [];
+            $('input.action-checkbox:checked').each(function() {
+                selected.push($(this).val());
+            });
+
+            if (selected.length === 0) {
+                alert('Vui lòng chọn ít nhất một bản ghi.');
+                return;
+            }
+
+            $('#actions-modal').modal('show');
+            $('#actions-confirm').off('click').on('click', function() {
+                var form = $('<form method="POST" action="{{ get_url(".action_view") }}">');
+                form.append($('<input type="hidden" name="action" value="' + name + '">'));
+                form.append($('<input type="hidden" name="url" value="{{ return_url }}">'));
+
+                for (var i = 0; i < selected.length; i++) {
+                    form.append($('<input type="hidden" name="rowid" value="' + selected[i] + '">'));
+                }
+
+                $('body').append(form);
+                form.submit();
+            });
+        }
+
+        // Select all functionality
+        $('input[name="rowtoggle"]').change(function() {
+            $('input.action-checkbox').prop('checked', $(this).prop('checked'));
+        });
+
+        // Update select all when individual checkboxes change
+        $('input.action-checkbox').change(function() {
+            var total = $('input.action-checkbox').length;
+            var checked = $('input.action-checkbox:checked').length;
+            $('input[name="rowtoggle"]').prop('checked', total === checked);
+        });
+    {% endif %}
+
+    // Auto-submit search on enter
+    $('input[name="search"]').keypress(function(e) {
+        if (e.which === 13) {
+            $(this).closest('form').submit();
+        }
+    });
+
+    // Confirm delete
+    $('form[action*="delete"]').submit(function(e) {
+        if (!confirm('Bạn có chắc chắn muốn xóa bản ghi này? Thao tác này không thể hoàn tác.')) {
+            e.preventDefault();
+            return false;
+        }
+    });
+</script>
+{% endblock %}

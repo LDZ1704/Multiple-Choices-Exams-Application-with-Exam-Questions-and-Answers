@@ -1,0 +1,254 @@
+{% extends 'admin/master.html' %}
+
+{% block title %}Trang chủ - LmaoQuiz Admin{% endblock %}
+
+{% block body %}
+<h2 class="page-title">Trang tổng quan</h2>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-center align-items-center mb-3">
+                    <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 15px; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi bi-file-text text-white" style="font-size: 24px;"></i>
+                    </div>
+                </div>
+                <h3 class="mb-2">{{ stats.total_exams }}</h3>
+                <p class="text-muted mb-0">Tổng đề thi</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-center align-items-center mb-3">
+                    <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #00b4db, #0083b0); border-radius: 15px; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi bi-people text-white" style="font-size: 24px;"></i>
+                    </div>
+                </div>
+                <h3 class="mb-2">{{ stats.total_users }}</h3>
+                <p class="text-muted mb-0">Người dùng</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-center align-items-center mb-3">
+                    <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #f093fb, #f5576c); border-radius: 15px; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi bi-bar-chart text-white" style="font-size: 24px;"></i>
+                    </div>
+                </div>
+                <h3 class="mb-2">{{ stats.total_attempts }}</h3>
+                <p class="text-muted mb-0">Lượt thi</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-center align-items-center mb-3">
+                    <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #4facfe, #00f2fe); border-radius: 15px; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi bi-question-circle text-white" style="font-size: 24px;"></i>
+                    </div>
+                </div>
+                <h3 class="mb-2">{{ stats.total_questions }}</h3>
+                <p class="text-muted mb-0">Câu hỏi</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Stats Row -->
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-center align-items-center mb-3">
+                    <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #a8e6cf, #7fcdcd); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi bi-book text-white" style="font-size: 20px;"></i>
+                    </div>
+                </div>
+                <h4 class="mb-2">{{ stats.total_subjects }}</h4>
+                <p class="text-muted mb-0">Môn học</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-center align-items-center mb-3">
+                    <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #ffecd2, #fcb69f); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi bi-chat text-white" style="font-size: 20px;"></i>
+                    </div>
+                </div>
+                <h4 class="mb-2">{{ stats.total_comments }}</h4>
+                <p class="text-muted mb-0">Bình luận</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content Row -->
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-file-text me-2"></i>
+                    Đề thi gần đây
+                </h5>
+                <a href="{{ url_for('exam.index_view') }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-eye me-1"></i>Xem tất cả
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                        <tr>
+                            <th>Tên đề thi</th>
+                            <th>Môn học</th>
+                            <th>Tác giả</th>
+                            <th>Ngày tạo</th>
+                            <th>Thao tác</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% if recent_exams %}
+                        {% for exam in recent_exams %}
+                        <tr>
+                            <td>
+                                <strong>{{ exam.exam_name }}</strong>
+                                <br>
+                                <small class="text-muted">{{ exam.duration }} phút</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-primary">{{ exam.subject.subject_name }}</span>
+                            </td>
+                            <td>{{ exam.createBy }}</td>
+                            <td>{{ exam.createAt.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>
+                                <a href="{{ url_for('exam.details_view', id=exam.id) }}"
+                                   class="btn btn-sm btn-outline-primary"
+                                   title="Xem chi tiết">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{{ url_for('exam.edit_view', id=exam.id) }}"
+                                   class="btn btn-sm btn-outline-warning"
+                                   title="Chỉnh sửa">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">
+                                <i class="bi bi-inbox display-4 d-block mb-3"></i>
+                                Chưa có đề thi nào được tạo
+                            </td>
+                        </tr>
+                        {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- Recent Activities -->
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-activity me-2"></i>
+                    Hoạt động gần đây
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_activities %}
+                {% for activity in recent_activities %}
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-{{ activity.type }} rounded-circle p-2 me-3"
+                         style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi bi-{{ activity.icon }} text-white"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <small class="text-muted">{{ activity.time_ago }}</small>
+                        <p class="mb-0">{{ activity.description }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="text-center text-muted">
+                    <i class="bi bi-clock-history display-6 d-block mb-3"></i>
+                    <p>Chưa có hoạt động nào</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-lightning me-2"></i>
+                    Thao tác nhanh
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('exam.create_view') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle me-2"></i>Tạo đề thi mới
+                    </a>
+                    <a href="{{ url_for('question.create_view') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-question-circle me-2"></i>Thêm câu hỏi
+                    </a>
+                    <a href="{{ url_for('subject.create_view') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-book me-2"></i>Thêm môn học
+                    </a>
+                    <a href="{{ url_for('user.index_view') }}" class="btn btn-outline-info">
+                        <i class="bi bi-people me-2"></i>Quản lý người dùng
+                    </a>
+                    <a href="{{ url_for('reports.index') }}" class="btn btn-outline-success">
+                        <i class="bi bi-graph-up me-2"></i>Xem thống kê
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Info -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Thông tin hệ thống
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <p><strong>Phiên bản:</strong> 1.0.0</p>
+                        <p><strong>Cơ sở dữ liệu:</strong> MySQL</p>
+                    </div>
+                    <div class="col-md-4">
+                        <p><strong>Máy chủ:</strong> Flask</p>
+                        <p><strong>Trạng thái:</strong> <span class="badge bg-success">Hoạt động</span></p>
+                    </div>
+                    <div class="col-md-4">
+                        <p><strong>Cập nhật cuối:</strong> {{ moment().now().strftime('%d/%m/%Y') if moment else 'N/A' }}</p>
+                        <p><strong>Admin:</strong> {{ current_user.name if current_user.is_authenticated else 'N/A' }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

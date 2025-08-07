@@ -3,9 +3,9 @@ import string
 import cloudinary
 import cloudinary.uploader
 import hashlib
-from flask import session
+from flask import session, flash
 from app import app, db, dao
-from app.models import User, ExamResult, ExamQuestions, Exam, Comment, Student, Question, Answer
+from app.models import User, ExamResult, ExamQuestions, Exam, Comment, Student, Question, Answer, ExamSession
 from datetime import datetime
 
 
@@ -220,3 +220,314 @@ def clear_exam_session(user_id, exam_id):
     except Exception as e:
         print(f"Lỗi khi xóa exam session: {e}")
         return False
+
+
+def create_exam(creator_id, exam_name, subject_id, duration, questions_data):
+    try:
+        user = dao.get_user_by_id(creator_id)
+
+        exam = Exam(
+            exam_name=exam_name,
+            subject_id=subject_id,
+            duration=duration,
+            user_id=creator_id,
+            createBy=user.name,
+            createAt=datetime.now()
+        )
+        db.session.add(exam)
+        db.session.flush()
+
+        for question_data in questions_data:
+            question = Question(
+                question_title=question_data['question_title'],
+                chapter_id=1, #default
+                user_id=creator_id,
+                createBy=user.name,
+                createAt=datetime.now()
+            )
+            db.session.add(question)
+            db.session.flush()
+
+            for answer_data in question_data['answers']:
+                answer = Answer(
+                    question_id=question.id,
+                    answer_text=answer_data['answer_text'],
+                    is_correct=answer_data['is_correct'],
+                    user_id=creator_id,
+                    createBy=user.name
+                )
+                db.session.add(answer)
+
+            exam_question = ExamQuestions(
+                exam_id=exam.id,
+                question_id=question.id
+            )
+            db.session.add(exam_question)
+
+        db.session.commit()
+        return exam.id
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Lỗi tạo đề thi: {e}")
+        return None
+
+
+def update_exam(exam_id, creator_id, exam_name, subject_id, duration, questions_data):
+    try:
+        exam = db.session.query(Exam).filter(
+            Exam.id == exam_id,
+            Exam.user_id == creator_id
+        ).first()
+
+        if not exam:
+            return False
+
+        user = dao.get_user_by_id(creator_id)
+
+        exam.exam_name = exam_name
+        exam.subject_id = subject_id
+        exam.duration = duration
+
+        old_exam_questions = db.session.query(ExamQuestions).filter(
+            ExamQuestions.exam_id == exam_id
+        ).all()
+
+        question_ids = [eq.question_id for eq in old_exam_questions]
+
+        for eq in old_exam_questions:
+            db.session.delete(eq)
+
+        for question_id in question_ids:
+            db.session.query(Answer).filter(Answer.question_id == question_id).delete()
+
+        for question_id in question_ids:
+            db.session.query(Question).filter(Question.id == question_id).delete()
+
+        for question_data in questions_data:
+            question = Question(
+                question_title=question_data['question_title'],
+                chapter_id=1,  #Default
+                user_id=creator_id,
+                createBy=user.name,
+                createAt=datetime.now()
+            )
+            db.session.add(question)
+            db.session.flush()
+
+            for answer_data in question_data['answers']:
+                answer = Answer(
+                    question_id=question.id,
+                    answer_text=answer_data['answer_text'],
+                    is_correct=answer_data['is_correct'],
+                    user_id=creator_id,
+                    createBy=user.name
+                )
+                db.session.add(answer)
+
+            exam_question = ExamQuestions(
+                exam_id=exam.id,
+                question_id=question.id
+            )
+            db.session.add(exam_question)
+
+        db.session.commit()
+        return True
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Lỗi cập nhật đề thi: {e}")
+        return False
+
+
+def delete_user_exam(exam_id, creator_id):
+    try:
+        exam = db.session.query(Exam).filter(
+            Exam.id == exam_id,
+            Exam.user_id == creator_id
+        ).first()
+
+        if not exam:
+            return False
+
+        db.session.query(ExamResult).filter(ExamResult.exam_id == exam_id).delete()
+
+        db.session.query(Comment).filter(Comment.exam_id == exam_id).delete()
+
+        exam_questions = db.session.query(ExamQuestions).filter(
+            ExamQuestions.exam_id == exam_id
+        ).all()
+        question_ids = [eq.question_id for eq in exam_questions]
+
+        for eq in exam_questions:
+            db.session.delete(eq)
+
+        for question_id in question_ids:
+            db.session.query(Answer).filter(Answer.question_id == question_id).delete()
+
+        for question_id in question_ids:
+            db.session.query(Question).filter(Question.id == question_id).delete()
+
+        db.session.delete(exam)
+        db.session.commit()
+        return True
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Lỗi xóa đề thi: {e}")
+        return False
+
+
+def create_random_exam(creator_id, exam_name, subject_id, duration, question_count):
+    try:
+        user = dao.get_user_by_id(creator_id)
+
+        available_questions_count = dao.get_questions_count_by_subject(subject_id)
+        if available_questions_count < question_count:
+            flash(f"Môn học này chỉ có {available_questions_count} câu hỏi. Vui lòng chọn số câu hỏi nhỏ hơn.", 'error')
+            return None
+
+        exam = Exam(
+            exam_name=exam_name,
+            subject_id=subject_id,
+            duration=duration,
+            user_id=creator_id,
+            createBy=user.name,
+            createAt=datetime.now()
+        )
+        db.session.add(exam)
+        db.session.flush()
+
+        random_questions = dao.get_random_questions_by_subject(subject_id, question_count)
+
+        for question in random_questions:
+            answers = dao.get_answers_by_question_id(question.id)
+            exam_question = ExamQuestions(
+                exam_id=exam.id,
+                question_id=question.id
+            )
+            db.session.add(exam_question)
+
+        db.session.commit()
+        return exam.id, None
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Lỗi tạo đề thi ngẫu nhiên: {e}")
+        return None, "Có lỗi xảy ra khi tạo đề thi ngẫu nhiên"
+
+
+def create_exam_session(student_id, exam_id):
+    try:
+        session_obj = ExamSession(student_id=student_id, exam_id=exam_id, start_time=datetime.now())
+        db.session.add(session_obj)
+        db.session.commit()
+        return session_obj
+    except Exception as e:
+        db.session.rollback()
+        print(f"Lỗi tạo exam session: {e}")
+        return None
+
+
+def update_exam_session(session_obj, current_question_index=None, user_answers=None, is_paused=None):
+    try:
+        if current_question_index is not None:
+            session_obj.current_question_index = current_question_index
+        if user_answers is not None:
+            session_obj.user_answers = user_answers
+        if is_paused is not None:
+            session_obj.is_paused = is_paused
+            if is_paused:
+                session_obj.pause_time = datetime.now()
+            else:
+                if session_obj.pause_time:
+                    pause_duration = (datetime.now() - session_obj.pause_time).total_seconds()
+                    session_obj.total_paused_duration += int(pause_duration)
+                session_obj.resume_time = datetime.now()
+
+        db.session.commit()
+        return True
+    except Exception as e:
+        db.session.rollback()
+        print(f"Lỗi cập nhật exam session: {e}")
+        return False
+
+
+def complete_exam_session(session_obj):
+    try:
+        session_obj.is_completed = True
+        db.session.commit()
+        return True
+    except Exception as e:
+        db.session.rollback()
+        print(f"Lỗi hoàn thành exam session: {e}")
+        return False
+
+
+def start_exam_session_db(student_id, exam_id):
+    try:
+        existing_session = dao.get_exam_session(student_id, exam_id)
+        if existing_session:
+            return existing_session
+
+        return create_exam_session(student_id, exam_id)
+    except Exception as e:
+        print(f"Lỗi start exam session: {e}")
+        return None
+
+
+def pause_exam_session(student_id, exam_id, current_question_index, user_answers):
+    try:
+        session_obj = dao.get_exam_session(student_id, exam_id)
+        if session_obj and not session_obj.is_paused:
+            return update_exam_session(session_obj, current_question_index=current_question_index, user_answers=user_answers, is_paused=True)
+        return False
+    except Exception as e:
+        print(f"Lỗi pause session: {e}")
+        return False
+
+
+def resume_exam_session(student_id, exam_id):
+    try:
+        session_obj = dao.get_exam_session(student_id, exam_id)
+        if session_obj and session_obj.is_paused:
+            return update_exam_session(session_obj, is_paused=False)
+        return False
+    except Exception as e:
+        print(f"Lỗi resume session: {e}")
+        return False
+
+
+def reset_exam_session(student_id, exam_id):
+    try:
+        existing_session = dao.get_exam_session(student_id, exam_id)
+        if existing_session and not existing_session.is_completed:
+            db.session.delete(existing_session)
+            db.session.commit()
+            return True
+        return True
+    except Exception as e:
+        db.session.rollback()
+        print(f"Lỗi reset exam session: {e}")
+        return False
+
+
+def save_exam_progress(student_id, exam_id, current_question_index, user_answers):
+    try:
+        session_obj = dao.get_exam_session(student_id, exam_id)
+        if session_obj:
+            return update_exam_session(session_obj, current_question_index=current_question_index, user_answers=user_answers)
+        return False
+    except Exception as e:
+        print(f"Lỗi save progress: {e}")
+        return False
+
+
+def get_highest_score(user_id, exam_id):
+    student = dao.get_student_by_user_id(user_id)
+    if not student:
+        return 0
+
+    highest_result = db.session.query(ExamResult).filter(ExamResult.student_id == student.id, ExamResult.exam_id == exam_id).order_by(ExamResult.score.desc()).first()
+
+    return highest_result.score if highest_result else 0

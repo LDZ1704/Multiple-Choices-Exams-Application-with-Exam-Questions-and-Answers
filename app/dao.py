@@ -4,7 +4,8 @@ from urllib import request
 from urllib.parse import urlparse, urljoin
 from flask import session
 from sqlalchemy import or_
-from app.models import User, Student, Admin, Exam, Subject, ExamResult, Question, Answer, ExamQuestions
+from app.models import User, Student, Admin, Exam, Subject, ExamResult, Question, Answer, ExamQuestions, Comment, \
+    Chapter, ExamSession
 from app import db, utils
 
 
@@ -148,6 +149,7 @@ def get_subject_by_id(subject_id):
 def get_student_by_user_id(user_id):
     return Student.query.filter_by(user_id=user_id).first()
 
+
 def get_exam_result_by_id(result_id):
     return ExamResult.query.get(result_id)
 
@@ -198,11 +200,7 @@ def get_exam_questions_count(exam_id):
 
 def get_student_exam_result(student_id, exam_id):
     try:
-        result = db.session.query(ExamResult).filter(
-            ExamResult.student_id == student_id,
-            ExamResult.exam_id == exam_id
-        ).first()
-
+        result = db.session.query(ExamResult).filter(ExamResult.student_id == student_id, ExamResult.exam_id == exam_id).order_by(ExamResult.taken_exam.desc()).first()
         return result
 
     except Exception as e:
@@ -229,7 +227,8 @@ def get_remaining_time(user_id, exam_id, exam_duration_minutes):
         return exam_duration_minutes * 60
 
 
-def get_exam_history_with_pagination(student_id, page=1, per_page=10, search_query=None, selected_subject=None, score_filter=None):
+def get_exam_history_with_pagination(student_id, page=1, per_page=10, search_query=None, selected_subject=None,
+                                     score_filter=None):
     query = db.session.query(ExamResult).join(Exam).join(Subject).filter(
         ExamResult.student_id == student_id
     )
@@ -262,6 +261,7 @@ def get_exam_history_with_pagination(student_id, page=1, per_page=10, search_que
         per_page=per_page,
         error_out=False
     )
+
 
 def get_all_subjects():
     return db.session.query(Subject).all()
@@ -329,7 +329,7 @@ def get_exam_questions_with_user_answers(exam_id, result_id):
                     'user_answer_id': int(user_answer_id) if user_answer_id else None,
                     'correct_answer_id': correct_answer.id if correct_answer else None,
                     'is_correct': (int(user_answer_id) == correct_answer.id) if (
-                                user_answer_id and correct_answer) else False
+                            user_answer_id and correct_answer) else False
                 }
 
             questions_dict[question.id]['answers'].append(answer)
@@ -350,3 +350,131 @@ def get_user_answer_for_result(result_id):
     except Exception as e:
         print(f"Lỗi khi lấy câu trả lời user: {e}")
         return {}
+
+
+def get_user_exam_for_edit(exam_id, creator_id):
+    try:
+        exam = db.session.query(Exam).filter(Exam.id == exam_id, Exam.user_id == creator_id).first()
+
+        if not exam:
+            return None
+
+        questions_data = get_exam_questions_with_answers(exam_id)
+
+        return {
+            'exam': exam,
+            'questions': questions_data
+        }
+
+    except Exception as e:
+        print(f"Lỗi lấy đề thi để sửa: {e}")
+        return None
+
+
+def get_user_created_exams_with_pagination(creator_id, page=1, per_page=6, search_query=None):
+    query = db.session.query(Exam).join(Subject).filter(Exam.user_id == creator_id)
+
+    if search_query:
+        query = query.filter(or_(Exam.exam_name.contains(search_query), Subject.subject_name.contains(search_query)))
+
+    query = query.order_by(Exam.createAt.desc())
+
+    return query.paginate(
+        page=page,
+        per_page=per_page,
+        error_out=False
+    )
+
+
+def get_random_questions_by_subject(subject_id, limit=50):
+    try:
+        chapters = db.session.query(Chapter).filter(Chapter.subject_id == subject_id).all()
+        chapter_ids = [chapter.id for chapter in chapters]
+
+        if not chapter_ids:
+            return []
+
+        questions = db.session.query(Question).filter(Question.chapter_id.in_(chapter_ids)).order_by(db.func.random()).limit(limit).all()
+
+        return questions
+    except Exception as e:
+        print(f"Lỗi lấy câu hỏi ngẫu nhiên: {e}")
+        return []
+
+
+def get_answers_by_question_id(question_id):
+    try:
+        answers = db.session.query(Answer).filter(
+            Answer.question_id == question_id
+        ).order_by(Answer.id).all()
+        return answers
+    except Exception as e:
+        print(f"Lỗi lấy đáp án: {e}")
+        return []
+
+
+def get_questions_count_by_subject(subject_id):
+    try:
+        chapters = db.session.query(Chapter).filter(Chapter.subject_id == subject_id).all()
+        chapter_ids = [chapter.id for chapter in chapters]
+
+        if not chapter_ids:
+            return 0
+
+        count = db.session.query(Question).filter(
+            Question.chapter_id.in_(chapter_ids)
+        ).count()
+
+        return count
+    except Exception as e:
+        print(f"Lỗi đếm câu hỏi: {e}")
+        return 0
+
+
+def get_exam_session(student_id, exam_id):
+    return db.session.query(ExamSession).filter(ExamSession.student_id == student_id, ExamSession.exam_id == exam_id, ExamSession.is_completed == False).first()
+
+
+def get_remaining_time_with_session(student_id, exam_id, exam_duration_minutes):
+    try:
+        session_obj = get_exam_session(student_id, exam_id)
+        if not session_obj:
+            return exam_duration_minutes * 60
+
+        current_time = datetime.now()
+        elapsed_time = (current_time - session_obj.start_time).total_seconds()
+
+        if session_obj.is_paused and session_obj.pause_time:
+            elapsed_time = (session_obj.pause_time - session_obj.start_time).total_seconds()
+
+        elapsed_time -= session_obj.total_paused_duration
+
+        total_seconds = exam_duration_minutes * 60
+        remaining_seconds = max(0, total_seconds - int(elapsed_time))
+
+        return remaining_seconds
+    except Exception as e:
+        print(f"Lỗi tính thời gian còn lại: {e}")
+        return exam_duration_minutes * 60
+
+
+def has_unfinished_exam_session(student_id, exam_id):
+    try:
+        session_obj = get_exam_session(student_id, exam_id)
+        if session_obj and not session_obj.is_completed:
+            has_progress = (session_obj.current_question_index > 0 or
+                          (session_obj.user_answers and len(session_obj.user_answers) > 0))
+            return has_progress
+        return False
+    except Exception as e:
+        print(f"Lỗi kiểm tra session: {e}")
+        return False
+
+
+def has_exam_result(student_id, exam_id):
+    try:
+        result = db.session.query(ExamResult).filter(ExamResult.student_id == student_id, ExamResult.exam_id == exam_id).first()
+        return result is not None
+    except Exception as e:
+        print(f"Lỗi khi kiểm tra kết quả: {e}")
+        return False

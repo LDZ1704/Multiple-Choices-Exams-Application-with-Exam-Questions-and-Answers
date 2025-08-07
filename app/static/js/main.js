@@ -1,9 +1,12 @@
 document.addEventListener('DOMContentLoaded', function() {
     //Tự động ẩn sau 5s thông báo
-    setTimeout(function() {
-        const alerts = document.querySelectorAll('.alert');
-        alerts.forEach(alert => {
-            alert.style.display = 'none';
+    setTimeout(function () {
+        const flashAlerts = document.querySelectorAll('.flash-alert');
+        flashAlerts.forEach(alert => {
+            alert.classList.remove('show');
+            setTimeout(() => {
+                alert.remove();
+            }, 300);
         });
     }, 5000);
 });

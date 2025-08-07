@@ -7,16 +7,16 @@ from app import app, db, login_manager, utils
 from app.models import User, Role, Student, ExamResult, Subject
 from app.models import Admin as AdminModels
 import app.dao as dao
-from app.admin import *
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
+from app.admin import *
 
 
 @app.context_processor
 def inject_user():
-    return dict(current_user=current_user)
+    return dict(current_user=current_user, admin=admin, dao=dao)
 
 
 @app.route('/')
@@ -24,14 +24,24 @@ def index():
     page = request.args.get('page', 1, type=int)
     search_query = request.args.get('search', '', type=str)
 
-    # Lấy danh sách đề thi với phân trang
+    message = request.args.get('message')
+    message_type = request.args.get('type', 'info')
+
+    if message:
+        if message == 'saved':
+            flash('Đã lưu bài thi thành công!', 'success')
+        elif message == 'completed':
+            flash('Đã hoàn thành bài thi!', 'success')
+        elif message == 'timeout':
+            flash('Hết thời gian làm bài!', 'warning')
+        return redirect(url_for('index', page=page, search=search_query))
+
     exams_pagination = dao.get_exams_with_pagination(
         page=page,
         per_page=app.config['PAGE_SIZE'],
         search_query=search_query.strip() if search_query else None
     )
 
-    # Lấy thống kê cho từng đề thi
     exams_with_stats = []
     for exam in exams_pagination.items:
         stats = utils.get_exam_stats(exam.id)
@@ -60,10 +70,6 @@ def login():
             login_user(user)
             flash('Chào mừng ' + username + ' tới LmaoQuiz', 'success')
 
-            if next_page:
-                print(next_page)
-                return redirect(next_page)
-
             if user.role == Role.ADMIN:
                 if not dao.existence_check(AdminModels, 'user_id', user.id):
                     dao.add_admin(user)
@@ -71,7 +77,8 @@ def login():
             elif user.role == Role.STUDENT:
                 if not dao.existence_check(Student, 'user_id', user.id):
                     dao.add_student(user)
-                return redirect('/')
+                return redirect(next_page) if next_page else redirect('/')
+
         else:
             flash('Thông tin tài khoản và mật khẩu không chính xác!', 'danger')
             err_message = 'Thông tin tài khoản và mật khẩu không chính xác!'
@@ -131,6 +138,7 @@ def register():
 def exam_detail():
     exam_id = request.args.get('id', type=int)
     comment_page = request.args.get('comment_page', 1, type=int)
+    session_obj = None
 
     if not exam_id:
         flash('Không tìm thấy đề thi!', 'error')
@@ -141,28 +149,27 @@ def exam_detail():
         flash('Đề thi không tồn tại!', 'error')
         return redirect(url_for('index'))
 
-    # Lấy thông tin bổ sung
+    if current_user.is_authenticated:
+        student = dao.get_student_by_user_id(current_user.id)
+        if student:
+            session_obj = dao.get_exam_session(student.id, exam_id)
+
     stats = utils.get_exam_stats(exam_id)
     question_count = utils.count_exam_questions(exam_id)
 
-    # Lấy đánh giá với phân trang
-    comments_pagination = utils.get_exam_comments_with_pagination(
-        exam_id,
-        page=comment_page,
-        per_page=5
-    )
+    comments_pagination = utils.get_exam_comments_with_pagination(exam_id, page=comment_page, per_page=app.config['COMMENT_SIZE'])
 
-    # Lấy kết quả của user hiện tại nếu đã đăng nhập
     user_results = None
+    highest_score = 0
+    has_result = False
     if current_user.is_authenticated:
         user_results = utils.get_user_exam_results(current_user.id, exam_id)
+        highest_score = utils.get_highest_score(current_user.id, exam_id)
+        student = dao.get_student_by_user_id(current_user.id)
+        if student:
+            has_result = dao.has_exam_result(student.id, exam_id)
 
-    return render_template('examdetail.html',
-                           exam=exam,
-                           stats=stats,
-                           question_count=question_count,
-                           comments_pagination=comments_pagination,
-                           user_results=user_results)
+    return render_template('examdetail.html', exam=exam, stats=stats, question_count=question_count, comments_pagination=comments_pagination, user_results=user_results, session=session_obj, highest_score=highest_score, has_result=has_result)
 
 
 @app.route('/add-exam-comment', methods=['POST'])
@@ -175,13 +182,11 @@ def add_exam_comment():
         flash('Vui lòng điền đầy đủ thông tin đánh giá!', 'error')
         return redirect(url_for('exam_detail', id=exam_id))
 
-    # Kiểm tra xem đề thi có tồn tại
     exam = dao.get_exam_by_id(exam_id)
     if not exam:
         flash('Đề thi không tồn tại!', 'error')
         return redirect(url_for('index'))
 
-    # Thêm đánh giá
     if utils.add_exam_comment(current_user.id, exam_id, content):
         flash('Đánh giá của bạn đã được gửi thành công!', 'success')
     else:
@@ -205,31 +210,33 @@ def account_detail():
 @app.route('/update-account', methods=['POST'])
 @login_required
 def update_account():
-    user_id = session.get('_user_id')
-    username = session.get('username')
-    name = request.form.get('name')
-    email = request.form.get('email')
-    gender = request.form.get('gender')
+    try:
+        user_id = session.get('_user_id')
+        username = session.get('username')
+        name = request.form.get('name')
+        email = request.form.get('email')
+        gender = request.form.get('gender')
 
-    if request.method == 'POST':
-        # Validation
-        if not name or not email or not gender or not username:
-            flash('Vui lòng điền đầy đủ thông tin!', 'error')
-            return redirect(url_for('account_detail'))
-        if '@' not in email:
-            flash('Email không hợp lệ!', 'error')
-            return redirect(url_for('account_detail'))
-        if dao.check_email_exists(email, user_id):
-            flash('Email đã tồn tại trong hệ thống!', 'error')
-            return redirect(url_for('account_detail'))
+        if request.method == 'POST':
+            if not name or not email or not gender or not username:
+                flash('Vui lòng điền đầy đủ thông tin!', 'error')
+                return redirect(url_for('account_detail'))
+            if '@' not in email:
+                flash('Email không hợp lệ!', 'error')
+                return redirect(url_for('account_detail'))
+            if dao.check_email_exists(email, user_id):
+                flash('Email đã tồn tại trong hệ thống!', 'error')
+                return redirect(url_for('account_detail'))
 
-        # Cập nhật thông tin
-        if utils.update_user_info(user_id, username, name, email, gender):
-            flash('Cập nhật thông tin thành công!', 'success')
-        else:
-            flash('Có lỗi xảy ra khi cập nhật thông tin!', 'error')
+            if utils.update_user_info(user_id, username, name, email, gender):
+                flash('Cập nhật thông tin thành công!', 'success')
+            else:
+                flash('Có lỗi xảy ra khi cập nhật thông tin!', 'error')
 
-    return redirect(url_for('account_detail'))
+        return redirect(url_for('account_detail'))
+    except Exception as e:
+        print(f"Lỗi chỉnh sửa thông tin: {e}")
+        return False
 
 
 @app.route('/update-avatar', methods=['POST'])
@@ -372,8 +379,7 @@ def verify_otp():
             session['step'] = 'reset_password'
             return redirect(url_for('reset_password'))
 
-    return render_template('verify-otp.html', err_message=err_message, success_message=success_message,
-                           remaining_seconds=remaining_seconds)
+    return render_template('verify-otp.html', err_message=err_message, success_message=success_message, remaining_seconds=remaining_seconds)
 
 
 @app.route('/api/otp-time-remaining')
@@ -431,9 +437,7 @@ def subjects():
     subjects_with_exams = dao.get_all_subjects_with_exams(
         search_query=search_query.strip() if search_query else None
     )
-    return render_template('subjects.html',
-                           subjects_with_exams=subjects_with_exams,
-                           search_query=search_query)
+    return render_template('subjects.html', subjects_with_exams=subjects_with_exams, search_query=search_query)
 
 
 @app.route('/doing-exam/<int:exam_id>')
@@ -444,15 +448,43 @@ def doing_exam(exam_id):
         flash('Đề thi không tồn tại!', 'error')
         return redirect(url_for('index'))
 
-    utils.start_exam_session(current_user.id, exam_id)
-    remaining_time = dao.get_remaining_time(current_user.id, exam_id, exam.duration)
+    student = dao.get_student_by_user_id(current_user.id)
+    if not student:
+        flash('Không tìm thấy thông tin học sinh!', 'error')
+        return redirect(url_for('index'))
+
+    existing_session = dao.get_exam_session(student.id, exam_id)
+
+    restart = request.args.get('restart', False)
+    if restart and existing_session and not existing_session.is_completed:
+        db.session.delete(existing_session)
+        db.session.commit()
+        existing_session = None
+
+    if not existing_session:
+        session_obj = utils.create_exam_session(student.id, exam_id)
+        if not session_obj:
+            flash('Không thể khởi tạo phiên thi!', 'error')
+            return redirect(url_for('index'))
+    else:
+        session_obj = existing_session
+
+    remaining_time = dao.get_remaining_time_with_session(student.id, exam_id, exam.duration)
 
     if remaining_time <= 0:
-        utils.clear_exam_session(current_user.id, exam_id)
+        utils.complete_exam_session(session_obj)
         flash('Thời gian làm bài đã hết!', 'warning')
         return redirect(url_for('index'))
 
-    return render_template('doing-exam.html', exam=exam, remaining_time=remaining_time)
+    return render_template('doing-exam.html',
+                           exam=exam,
+                           remaining_time=remaining_time,
+                           has_saved_progress=len(session_obj.user_answers) if session_obj.user_answers else 0,
+                           session_data={
+                               'current_question_index': session_obj.current_question_index,
+                               'user_answers': session_obj.user_answers or {},
+                               'is_paused': session_obj.is_paused
+                           })
 
 
 @app.route('/api/exam/<int:exam_id>/remaining-time')
@@ -462,12 +494,80 @@ def get_exam_remaining_time(exam_id):
     if not exam:
         return jsonify({'error': 'Đề thi không tồn tại'}), 404
 
-    remaining_time = dao.get_remaining_time(current_user.id, exam_id, exam.duration)
+    student = dao.get_student_by_user_id(current_user.id)
+    remaining_time = dao.get_remaining_time_with_session(student.id, exam_id, exam.duration)
 
     return jsonify({
         'remaining_time': remaining_time,
         'expired': remaining_time <= 0
     })
+
+
+@app.route('/api/exam/<int:exam_id>/pause', methods=['POST'])
+@login_required
+def pause_exam(exam_id):
+    data = request.get_json()
+    current_question_index = data.get('current_question_index', 0)
+    user_answers = data.get('user_answers', {})
+
+    student = dao.get_student_by_user_id(current_user.id)
+
+    if utils.pause_exam_session(student.id, exam_id, current_question_index, user_answers):
+        return jsonify({'success': True, 'message': 'Đã tạm dừng bài thi'})
+    else:
+        return jsonify({'error': 'Không thể tạm dừng bài thi'}), 500
+
+
+@app.route('/api/exam/<int:exam_id>/resume', methods=['POST'])
+@login_required
+def resume_exam(exam_id):
+    student = dao.get_student_by_user_id(current_user.id)
+
+    if utils.resume_exam_session(student.id, exam_id):
+        return jsonify({'success': True, 'message': 'Đã tiếp tục bài thi'})
+    else:
+        return jsonify({'error': 'Không thể tiếp tục bài thi'}), 500
+
+
+@app.route('/api/exam/<int:exam_id>/save-progress', methods=['POST'])
+@login_required
+def save_exam_progress(exam_id):
+    data = request.get_json()
+    current_question_index = data.get('current_question_index', 0)
+    user_answers = data.get('user_answers', {})
+
+    student = dao.get_student_by_user_id(current_user.id)
+
+    if utils.save_exam_progress(student.id, exam_id, current_question_index, user_answers):
+        return jsonify({'success': True, 'message': 'Lưu tiến trình thành công!'})
+    else:
+        return jsonify({'error': 'Không thể lưu tiến trình'}), 500
+
+
+@app.route('/api/exam/<int:exam_id>/save-and-exit', methods=['POST'])
+@login_required
+def save_and_exit_exam(exam_id):
+    try:
+        data = request.get_json()
+        current_question_index = data.get('current_question_index', 0)
+        user_answers = data.get('user_answers', {})
+
+        student = dao.get_student_by_user_id(current_user.id)
+        if not student:
+            return jsonify({'error': 'Không tìm thấy thông tin học sinh'}), 404
+
+        if utils.pause_exam_session(student.id, exam_id, current_question_index, user_answers):
+            return jsonify({
+                'success': True,
+                'message': 'Đã lưu bài thi thành công!',
+                'redirect_url': url_for('index', message='saved', type='success')
+            })
+        else:
+            return jsonify({'error': 'Không thể lưu bài thi'}), 500
+
+    except Exception as e:
+        print(f"Lỗi save and exit: {e}")
+        return jsonify({'error': 'Có lỗi xảy ra khi lưu bài thi'}), 500
 
 
 @app.route('/api/exam/<int:exam_id>/questions')
@@ -491,6 +591,30 @@ def get_exam_questions(exam_id):
     })
 
 
+@app.route('/api/exam/<int:exam_id>/restart', methods=['POST'])
+@login_required
+def restart_exam(exam_id):
+    try:
+        student = dao.get_student_by_user_id(current_user.id)
+        if not student:
+            return jsonify({'error': 'Không tìm thấy thông tin học sinh'}), 404
+
+        existing_session = dao.get_exam_session(student.id, exam_id)
+        if existing_session and not existing_session.is_completed:
+            db.session.delete(existing_session)
+            db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Đã reset bài thi thành công!'
+        })
+
+    except Exception as e:
+        print(f"Lỗi restart exam: {e}")
+        db.session.rollback()
+        return jsonify({'error': 'Có lỗi xảy ra khi reset bài thi'}), 500
+
+
 @app.route('/api/exam/submit', methods=['POST'])
 @login_required
 def submit_exam():
@@ -506,14 +630,16 @@ def submit_exam():
     if not exam:
         return jsonify({'error': 'Đề thi không tồn tại'}), 404
 
-    remaining_time = dao.get_remaining_time(current_user.id, exam_id, exam.duration)
-    if remaining_time <= 0:
-        utils.clear_exam_session(current_user.id, exam_id)
-        return jsonify({'error': 'Thời gian làm bài đã hết'}), 400
-
     student = dao.get_student_by_user_id(current_user.id)
     if not student:
         return jsonify({'error': 'Không tìm thấy thông tin học sinh'}), 404
+
+    remaining_time = dao.get_remaining_time_with_session(student.id, exam_id, exam.duration)
+    if remaining_time <= 0:
+        session_obj = dao.get_exam_session(student.id, exam_id)
+        if session_obj:
+            utils.complete_exam_session(session_obj)
+        return jsonify({'error': 'Thời gian làm bài đã hết'}), 400
 
     actual_time_taken = (exam.duration * 60) - remaining_time
 
@@ -521,7 +647,10 @@ def submit_exam():
     result_id = utils.save_exam_result(student.id, exam_id, score, answers, actual_time_taken)
 
     if result_id:
-        utils.clear_exam_session(current_user.id, exam_id)
+        session_obj = dao.get_exam_session(student.id, exam_id)
+        if session_obj:
+            utils.complete_exam_session(session_obj)
+
         return jsonify({
             'success': True,
             'score': score,
@@ -546,9 +675,7 @@ def view_exam_result(result_id):
         flash('Kết quả thi không tồn tại!', 'error')
         return redirect(url_for('index'))
 
-    return render_template('exam-result.html',
-                         result=result_data['result'],
-                         questions_with_answers=result_data['questions_with_answers'])
+    return render_template('exam-result.html', result=result_data['result'], questions_with_answers=result_data['questions_with_answers'])
 
 
 @app.route('/exam-history')
@@ -575,13 +702,216 @@ def exam_history():
 
     subjects = dao.get_all_subjects()
 
-    return render_template('exam-history.html',
-                         exam_results=pagination.items,
-                         pagination=pagination,
-                         search_query=search_query,
-                         selected_subject=selected_subject,
-                         score_filter=score_filter,
-                         subjects=subjects)
+    return render_template('exam-history.html', exam_results=pagination.items, pagination=pagination, search_query=search_query, selected_subject=selected_subject, score_filter=score_filter, subjects=subjects)
+
+
+@app.route('/user-exams')
+@login_required
+def user_exams():
+    page = request.args.get('page', 1, type=int)
+    search_query = request.args.get('search', '', type=str)
+
+    exams_pagination = dao.get_user_created_exams_with_pagination(
+        creator_id=current_user.id,
+        page=page,
+        per_page=app.config['PAGE_SIZE'],
+        search_query=search_query.strip() if search_query else None
+    )
+
+    exams_with_stats = []
+    for exam in exams_pagination.items:
+        stats = utils.get_exam_stats(exam.id)
+        question_count = utils.count_exam_questions(exam.id)
+
+        exams_with_stats.append({
+            'exam': exam,
+            'stats': stats,
+            'question_count': question_count
+        })
+
+    return render_template('user-exams.html', exams=exams_with_stats, pagination=exams_pagination, search_query=search_query)
+
+
+@app.route('/create-exam', methods=['GET', 'POST'])
+@login_required
+def create_exam():
+    if request.method == 'POST':
+        data = request.get_json()
+        exam_name = data.get('exam_name', '').strip()
+        subject_id = data.get('subject_id')
+        duration = data.get('duration')
+        questions_data = data.get('questions', [])
+
+        if not exam_name or not subject_id or not duration or not questions_data:
+            flash('Vui lòng điền đầy đủ thông tin!', 'error')
+            return jsonify({'error': 'Vui lòng điền đầy đủ thông tin'}), 400
+
+        if len(questions_data) < 1:
+            flash('Đề thi phải có ít nhất 1 câu hỏi', 'error')
+            return jsonify({'error': 'Đề thi phải có ít nhất 1 câu hỏi'}), 400
+
+        #Validate
+        for i, question in enumerate(questions_data):
+            if not question.get('question_title', '').strip():
+                flash(f'Câu hỏi {i + 1} không được để trống', 'error')
+                return jsonify({'error': f'Câu hỏi {i + 1} không được để trống'}), 400
+
+            answers = question.get('answers', [])
+            if len(answers) < 2:
+                flash(f'Câu hỏi {i + 1} phải có ít nhất 2 đáp án', 'error')
+                return jsonify({'error': f'Câu hỏi {i + 1} phải có ít nhất 2 đáp án'}), 400
+
+            has_correct = any(answer.get('is_correct') for answer in answers)
+            if not has_correct:
+                flash(f'Câu hỏi {i + 1} phải có ít nhất 1 đáp án đúng', 'error')
+                return jsonify({'error': f'Câu hỏi {i + 1} phải có ít nhất 1 đáp án đúng'}), 400
+
+        exam_id = utils.create_exam(current_user.id, exam_name, subject_id, duration, questions_data)
+
+        if exam_id:
+            flash('Tạo đề thi thành công!', 'success')
+            return jsonify({
+                'success': True,
+                'message': 'Tạo đề thi thành công!',
+                'exam_id': exam_id,
+                'redirect_url': url_for('user_exams')
+            })
+        else:
+            flash('Có lỗi xảy ra khi tạo đề thi', 'error')
+            return jsonify({'error': 'Có lỗi xảy ra khi tạo đề thi'}), 500
+
+    subjects = dao.get_all_subjects()
+    return render_template('create-exam.html', subjects=subjects)
+
+
+@app.route('/edit-exam/<int:exam_id>', methods=['GET', 'POST'])
+@login_required
+def edit_exam(exam_id):
+    exam_data = dao.get_user_exam_for_edit(exam_id, current_user.id)
+
+    if not exam_data:
+        flash('Không tìm thấy đề thi hoặc bạn không có quyền chỉnh sửa!', 'error')
+        return redirect(url_for('user_exams'))
+
+    if request.method == 'POST':
+        data = request.get_json()
+        exam_name = data.get('exam_name', '').strip()
+        subject_id = data.get('subject_id')
+        duration = data.get('duration')
+        questions_data = data.get('questions', [])
+
+        if not exam_name or not subject_id or not duration or not questions_data:
+            flash('Vui lòng điền đầy đủ thông tin', 'error')
+            return jsonify({'error': 'Vui lòng điền đầy đủ thông tin'}), 400
+
+        if len(questions_data) < 1:
+            flash('Đề thi phải có ít nhất 1 câu hỏi', 'error')
+            return jsonify({'error': 'Đề thi phải có ít nhất 1 câu hỏi'}), 400
+
+        #Validate
+        for i, question in enumerate(questions_data):
+            if not question.get('question_title', '').strip():
+                flash(f'Câu hỏi {i + 1} không được để trống', 'error')
+                return jsonify({'error': f'Câu hỏi {i + 1} không được để trống'}), 400
+
+            answers = question.get('answers', [])
+            if len(answers) < 2:
+                flash(f'Câu hỏi {i + 1} phải có ít nhất 2 đáp án', 'error')
+                return jsonify({'error': f'Câu hỏi {i + 1} phải có ít nhất 2 đáp án'}), 400
+
+            has_correct = any(answer.get('is_correct') for answer in answers)
+            if not has_correct:
+                flash(f'Câu hỏi {i + 1} phải có ít nhất 1 đáp án đúng', 'error')
+                return jsonify({'error': f'Câu hỏi {i + 1} phải có ít nhất 1 đáp án đúng'}), 400
+
+        if utils.update_exam(exam_id, current_user.id, exam_name, subject_id, duration, questions_data):
+            flash('Cập nhật đề thi thành công!', 'success')
+            return jsonify({
+                'success': True,
+                'message': 'Cập nhật đề thi thành công!',
+                'redirect_url': url_for('user_exams')
+            })
+        else:
+            flash('Có lỗi xảy ra khi cập nhật đề thi', 'error')
+            return jsonify({'error': 'Có lỗi xảy ra khi cập nhật đề thi'}), 500
+
+    subjects = dao.get_all_subjects()
+    return render_template('edit-exam.html', exam_data=exam_data, subjects=subjects)
+
+
+@app.route('/delete-exam/<int:exam_id>', methods=['POST'])
+@login_required
+def delete_exam(exam_id):
+    if utils.delete_user_exam(exam_id, current_user.id):
+        flash('Xóa đề thi thành công!', 'success')
+    else:
+        flash('Có lỗi xảy ra khi xóa đề thi!', 'error')
+
+    return redirect(url_for('user_exams'))
+
+
+@app.route('/create-random-exam', methods=['GET', 'POST'])
+@login_required
+def create_random_exam():
+    if request.method == 'POST':
+        data = request.get_json()
+        exam_name = data.get('exam_name', '').strip()
+        subject_id = data.get('subject_id')
+        duration = data.get('duration')
+        question_count = data.get('question_count', 10)
+
+        # Validation
+        if not exam_name or not subject_id or not duration:
+            flash('Vui lòng điền đầy đủ thông tin', 'error')
+            return jsonify({'error': 'Vui lòng điền đầy đủ thông tin'}), 400
+
+        if question_count < 1:
+            flash('Số câu hỏi phải lớn hơn 0', 'error')
+            return jsonify({'error': 'Số câu hỏi phải lớn hơn 0'}), 400
+
+        if question_count > 50:
+            flash('Số câu hỏi không được vượt quá 50', 'error')
+            return jsonify({'error': 'Số câu hỏi không được vượt quá 50'}), 400
+
+        subject = dao.get_subject_by_id(subject_id)
+        if not subject:
+            flash('Môn học không tồn tại', 'error')
+            return jsonify({'error': 'Môn học không tồn tại'}), 400
+
+        exam_id, error_message = utils.create_random_exam(
+            current_user.id, exam_name, subject_id, duration, question_count
+        )
+
+        if exam_id:
+            flash('Tạo đề thi ngẫu nhiên thành công!', 'success')
+            return jsonify({
+                'success': True,
+                'message': 'Tạo đề thi ngẫu nhiên thành công!',
+                'exam_id': exam_id,
+                'redirect_url': url_for('user_exams')
+            })
+        else:
+            flash('Có lỗi xảy ra khi tạo đề thi', 'error')
+            return jsonify({'error': error_message or 'Có lỗi xảy ra khi tạo đề thi'}), 500
+
+    subjects = dao.get_all_subjects()
+    return render_template('create-random-exam.html', subjects=subjects)
+
+
+@app.route('/api/subject/<int:subject_id>/questions-count')
+@login_required
+def get_subject_questions_count(subject_id):
+    try:
+        count = dao.get_questions_count_by_subject(subject_id)
+        return jsonify({
+            'success': True,
+            'count': count
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Có lỗi xảy ra khi lấy thông tin'
+        }), 500
 
 
 if __name__ == '__main__':

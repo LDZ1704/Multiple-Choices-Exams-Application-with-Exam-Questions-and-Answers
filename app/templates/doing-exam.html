@@ -1,18 +1,18 @@
 {% extends 'layout/base.html' %}
 
 {% block content %}
-<!-- Timer Box -->
-<div class="position-fixed top-50 end-0 m-3 z-index-1000" style="z-index: 1050;">
-    <div class="card shadow-lg border-0" style="min-width: 200px;">
-        <div class="card-body bg-gradient text-white text-center p-3"
-             style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-            <div class="d-flex align-items-center justify-content-center mb-2">
-                <i class="fas fa-clock me-2"></i>
-                <span class="fw-bold">Thời gian còn lại</span>
-            </div>
-            <h3 id="timer" class="mb-0 fw-bold text-light">{{ exam.duration }}:00</h3>
-            <div class="progress mt-2" style="height: 4px;">
-                <div id="timer-progress" class="progress-bar bg-warning" role="progressbar" style="width: 100%"></div>
+<!-- Pause Overlay -->
+<div id="pauseOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none"
+     style="background: rgba(0,0,0,0.8); z-index: 2000;">
+    <div class="d-flex align-items-center justify-content-center h-100">
+        <div class="card shadow-lg border-0" style="max-width: 400px;">
+            <div class="card-body text-center p-5">
+                <i class="fas fa-pause-circle text-warning fs-1 mb-3"></i>
+                <h3 class="fw-bold text-warning">Bài thi đã tạm dừng</h3>
+                <p class="text-muted mb-4">Thời gian sẽ không chạy khi bạn tạm dừng. Nhấn tiếp tục để làm bài.</p>
+                <button class="btn btn-primary btn-lg rounded-pill px-4" onclick="togglePauseResume()">
+                    <i class="fas fa-play me-2"></i>Tiếp tục làm bài
+                </button>
             </div>
         </div>
     </div>
@@ -101,9 +101,16 @@
 
                         <!-- Submit Button -->
                         <div class="text-center mt-4" id="submit-container" style="display: none;">
-                            <button type="button" class="btn btn-success btn-lg rounded-pill px-5 shadow"
+                            <button type="button" class="btn btn-warning btn-lg rounded-pill px-5 shadow me-3"
+                                    onclick="saveAndExit()">
+                                <i class="fas fa-save me-2"></i>Lưu bài thi
+                            </button>
+                            <button type="button" class="btn btn-success btn-lg rounded-pill px-5 shadow me-3"
                                     onclick="showSubmitModal()">
                                 <i class="fas fa-paper-plane me-2"></i>Nộp bài thi
+                            </button>
+                            <button type="button" class="btn btn-danger btn-lg rounded-pill px-5 shadow" onclick="confirmRestartExam()">
+                                <i class="fas fa-paper-plane me-2"></i>Làm lại từ đầu
                             </button>
                         </div>
                     </form>
@@ -114,6 +121,24 @@
         <!-- Enhanced Sidebar -->
         <div class="col-xl-4 col-lg-4">
             <div class="sticky-top" style="top: 20px;">
+                <!-- Timer Box -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-body bg-gradient text-white text-center p-4"
+                         style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);" id="timer-container">
+                        <div class="d-flex align-items-center justify-content-center mb-2 fs-3">
+                            <i class="fas fa-clock me-2"></i>
+                            <span class="fw-bold">Thời gian còn lại</span>
+                        </div>
+                        <h2 id="timer" class="mb-0 fw-bold text-light">{{ exam.duration }}:00</h2>
+                        <div class="progress mt-3" style="height: 6px;">
+                            <div id="timer-progress" class="progress-bar bg-warning" role="progressbar" style="width: 100%"></div>
+                        </div>
+                        <button id="pauseResumeBtn" class="btn btn-sm btn-light mt-3 w-100" onclick="togglePauseResume()">
+                            <i class="fas fa-pause me-1"></i> Tạm dừng
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Progress Overview -->
                 <div class="card shadow-sm border-0 mb-4">
                     <div class="card-header bg-gradient text-white border-0"
@@ -236,29 +261,203 @@
     </div>
 </div>
 
+<!-- Modal xác nhận lưu bài -->
+<div class="modal fade" id="saveExitModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-gradient text-white border-0"
+                 style="background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);">
+                <h5 class="modal-title fw-bold">
+                    <i class="fas fa-save me-2"></i>Lưu bài thi
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <i class="fas fa-save text-warning fs-1 mb-3"></i>
+                    <h5 class="fw-bold">Bạn có muốn lưu bài thi và thoát không?</h5>
+                    <p class="text-muted">Bạn có thể tiếp tục làm bài sau bằng cách vào lại đề thi này.</p>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="text-center p-3 bg-success bg-opacity-10 rounded-3">
+                            <i class="fas fa-check-circle text-white fs-3 mb-2"></i>
+                            <h3 class="mb-0 text-white fw-bold" id="save-answered-count">0</h3>
+                            <small class="text-white">Câu đã làm</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-center p-3 bg-warning bg-opacity-10 rounded-3">
+                            <i class="fas fa-clock text-danger fs-3 mb-2"></i>
+                            <h3 class="mb-0 text-danger fw-bold" id="save-unanswered-count">0</h3>
+                            <small class="text-danger">Câu chưa làm</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Hủy
+                </button>
+                <button type="button" class="btn btn-warning rounded-pill px-4" onclick="confirmSaveAndExit()">
+                    <i class="fas fa-save me-2"></i>Lưu và thoát
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal xác nhận làm lại -->
+<div class="modal fade" id="restartExamModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-gradient text-white border-0"
+                 style="background: linear-gradient(135deg, #ff416c 0%, #ff4757 100%);">
+                <h5 class="modal-title fw-bold">
+                    <i class="fas fa-redo me-2"></i>Xác nhận làm lại
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <i class="fas fa-exclamation-triangle text-danger fs-1 mb-3"></i>
+                    <h5 class="fw-bold">Bạn có chắc chắn muốn làm lại bài thi không?</h5>
+                    <p class="text-muted">Toàn bộ tiến trình hiện tại sẽ bị xóa và không thể khôi phục.</p>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="text-center p-3 bg-success bg-opacity-10 rounded-3">
+                            <i class="fas fa-check-circle text-white fs-3 mb-2"></i>
+                            <h3 class="mb-0 text-white fw-bold" id="restart-answered-count">0</h3>
+                            <small class="text-white">Câu đã làm</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-center p-3 bg-warning bg-opacity-10 rounded-3">
+                            <i class="fas fa-trash-alt text-danger fs-3 mb-2"></i>
+                            <h3 class="mb-0 text-danger fw-bold">SẼ MẤT</h3>
+                            <small class="text-danger">Tiến trình</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning mt-2">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-clock me-2"></i>
+                        <div>
+                            <strong>Thời gian đã làm bài:</strong>
+                            <span id="restart-time-used">0 phút</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Hủy
+                </button>
+                <button type="button" class="btn btn-danger rounded-pill px-4" onclick="restartExam()">
+                    <i class="fas fa-redo me-2"></i>Làm lại từ đầu
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-    let currentQuestionIndex = 0;
+    let currentQuestionIndex = {{ session_data.current_question_index }};
     let questions = [];
-    let userAnswers = {};
+    let userAnswers = {{ session_data.user_answers | tojson }};
     let examTimer;
     let timeRemaining;
     let examSubmitted = false;
+    let isPaused = {{ session_data.is_paused | lower }};
+    const examId = {{ exam.id }};
 
     // Load exam data when page loads
     document.addEventListener('DOMContentLoaded', function() {
         loadExamQuestions();
         initializeTimer();
 
+        setInterval(autoSaveProgress, 30000);
+
+        if (isPaused) {
+            document.getElementById('pauseOverlay').classList.remove('d-none');
+            document.getElementById('pauseResumeBtn').innerHTML = '<i class="fas fa-play me-1"></i> Tiếp tục';
+        }
+
         window.addEventListener('beforeunload', function(e) {
-            if (!examSubmitted) {
+            if (!examSubmitted && !isPaused) {
+                autoSaveProgress();
                 e.preventDefault();
                 e.returnValue = 'Bạn có chắc chắn muốn rời khỏi trang? Dữ liệu bài thi sẽ bị mất.';
             }
         });
     });
 
+    function autoSaveProgress() {
+        if (!isPaused && !examSubmitted) {
+            fetch(`/api/exam/${examId}/save-progress`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    current_question_index: currentQuestionIndex,
+                    user_answers: userAnswers
+                })
+            }).catch(err => console.error('Auto-save failed:', err));
+        }
+    }
+
+    function togglePauseResume() {
+        if (isPaused) {
+            resumeExam();
+        } else {
+            pauseExam();
+        }
+    }
+
+    function pauseExam() {
+        fetch(`/api/exam/${examId}/pause`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                current_question_index: currentQuestionIndex,
+                user_answers: userAnswers
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                isPaused = true;
+                clearInterval(examTimer);
+                document.getElementById('pauseOverlay').classList.remove('d-none');
+                document.getElementById('pauseResumeBtn').innerHTML = '<i class="fas fa-play me-1"></i> Tiếp tục';
+                document.getElementById('timer-container').style.background = 'linear-gradient(135deg, #ffa726 0%, #fb8c00 100%)';
+            }
+        })
+        .catch(err => console.error('Pause failed:', err));
+    }
+
+    function resumeExam() {
+        fetch(`/api/exam/${examId}/resume`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                isPaused = false;
+                document.getElementById('pauseOverlay').classList.add('d-none');
+                document.getElementById('pauseResumeBtn').innerHTML = '<i class="fas fa-pause me-1"></i> Tạm dừng';
+                document.getElementById('timer-container').style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                initializeTimer(); // Restart timer
+            }
+        })
+        .catch(err => console.error('Resume failed:', err));
+    }
+
     function loadExamQuestions() {
-        const examId = {{ exam.id }};
         fetch(`/api/exam/${examId}/questions`)
             .then(res => res.json())
             .then(data => {
@@ -271,7 +470,7 @@
 
                 updateQuestionCounts();
                 generateQuestionList();
-                displayQuestion(0);
+                displayQuestion(currentQuestionIndex);
             })
             .catch(err => {
                 console.error('Lỗi tải câu hỏi:', err);
@@ -282,36 +481,50 @@
     }
 
     function initializeTimer() {
-        timeRemaining = {{ remaining_time }};
+        if (isPaused) return;
 
-        if (timeRemaining <= 0) {
-            autoSubmitExam();
-            return;
-        }
+        fetch(`/api/exam/${examId}/remaining-time`)
+            .then(res => res.json())
+            .then(data => {
+                timeRemaining = data.remaining_time;
 
-        updateTimerDisplay();
+                if (timeRemaining <= 0) {
+                    autoSubmitExam();
+                    return;
+                }
 
-        examTimer = setInterval(() => {
-            timeRemaining--;
-            updateTimerDisplay();
+                updateTimerDisplay();
 
-            if (timeRemaining === 300) {
-                showTimeWarning(5);
-            } else if (timeRemaining === 60) {
-                showTimeWarning(1);
-            }
+                examTimer = setInterval(() => {
+                    if (!isPaused) {
+                        timeRemaining--;
+                        updateTimerDisplay();
 
-            if (timeRemaining <= 0) {
-                clearInterval(examTimer);
-                autoSubmitExam();
-            }
-        }, 1000);
+                        if (timeRemaining === 300) {
+                            showTimeWarning(5);
+                        } else if (timeRemaining === 60) {
+                            showTimeWarning(1);
+                        }
 
-        setInterval(syncTimeWithServer, 30000);
+                        if (timeRemaining <= 0) {
+                            clearInterval(examTimer);
+                            autoSubmitExam();
+                        }
+                    }
+                }, 1000);
+
+                setInterval(syncTimeWithServer, 30000);
+            })
+            .catch(err => {
+                console.error('Error getting remaining time:', err);
+                timeRemaining = {{ remaining_time }};
+                updateTimerDisplay();
+            });
     }
 
     function syncTimeWithServer() {
-        const examId = {{ exam.id }};
+        if (isPaused) return;
+
         fetch(`/api/exam/${examId}/remaining-time`)
             .then(res => res.json())
             .then(data => {
@@ -342,13 +555,19 @@
 
         if (timeRemaining <= 300) {
             timerElement.className = 'mb-0 fw-bold text-light';
-            timerElement.parentElement.style.background = 'linear-gradient(135deg, #ff416c 0%, #ff4757 100%)';
+            if (!isPaused) {
+                document.getElementById('timer-container').style.background = 'linear-gradient(135deg, #ff416c 0%, #ff4757 100%)';
+            }
         } else if (timeRemaining <= 600) {
             timerElement.className = 'mb-0 fw-bold text-light';
-            timerElement.parentElement.style.background = 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)';
+            if (!isPaused) {
+                document.getElementById('timer-container').style.background = 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)';
+            }
         } else {
             timerElement.className = 'mb-0 fw-bold text-light';
-            timerElement.parentElement.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            if (!isPaused) {
+                document.getElementById('timer-container').style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            }
         }
 
         const totalTime = {{ exam.duration }} * 60;
@@ -357,9 +576,11 @@
     }
 
     function showTimeWarning(minutes) {
-        document.getElementById('warning-time').textContent = minutes;
-        const modal = new bootstrap.Modal(document.getElementById('timeWarningModal'));
-        modal.show();
+        if (!isPaused) {
+            document.getElementById('warning-time').textContent = minutes;
+            const modal = new bootstrap.Modal(document.getElementById('timeWarningModal'));
+            modal.show();
+        }
     }
 
     function updateQuestionCounts() {
@@ -373,6 +594,8 @@
         document.getElementById('unanswered-count').textContent = unansweredCount;
         document.getElementById('final-answered-count').textContent = answeredCount;
         document.getElementById('final-unanswered-count').textContent = unansweredCount;
+        document.getElementById('save-answered-count').textContent = answeredCount;
+        document.getElementById('save-unanswered-count').textContent = unansweredCount;
 
         const progressPercent = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
         document.getElementById('progress-bar').style.width = progressPercent + '%';
@@ -380,23 +603,19 @@
 
     function generateQuestionList() {
         const questionListContainer = document.getElementById('question-list');
-        let html = '<div class="row g-2">';
+        let html = '';
 
         questions.forEach((question, index) => {
             const isAnswered = userAnswers[question.id] !== undefined;
             const isActive = index === currentQuestionIndex;
 
             html += `
-                <div class="col-3">
-                    <button type="button" class="btn btn-sm w-100 question-nav-btn ${getQuestionButtonClass(isAnswered, isActive)}"
-                            onclick="goToQuestion(${index})" data-question-index="${index}">
-                        ${index + 1}
-                    </button>
-                </div>
+                <button type="button" class="btn btn-sm question-nav-btn ${getQuestionButtonClass(isAnswered, isActive)}" onclick="goToQuestion(${index})" data-question-index="${index}">
+                    ${index + 1}
+                </button>
             `;
         });
 
-        html += '</div>';
         questionListContainer.innerHTML = html;
     }
 
@@ -459,6 +678,7 @@
         userAnswers[questionId] = answerId;
         updateQuestionCounts();
         generateQuestionList();
+        autoSaveProgress(); // Auto-save when answer changes
     }
 
     function changeQuestion(direction) {
@@ -483,7 +703,7 @@
         clearInterval(examTimer);
 
         const submissionData = {
-            exam_id: {{ exam.id }},
+            exam_id: examId,
             answers: userAnswers,
             time_taken: ({{ exam.duration }} * 60) - timeRemaining
         };
@@ -537,6 +757,71 @@
             alert('Hết thời gian! Bài thi sẽ được nộp tự động.');
             submitExam();
         }
+    }
+
+    function saveAndExit() {
+    const modal = new bootstrap.Modal(document.getElementById('saveExitModal'));
+    modal.show();
+    }
+
+    function confirmSaveAndExit() {
+        clearInterval(examTimer);
+        isPaused = true;
+
+        fetch(`/api/exam/${examId}/save-and-exit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                current_question_index: currentQuestionIndex,
+                user_answers: userAnswers
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                examSubmitted = true;
+                window.location.href = data.redirect_url;
+            } else {
+                isPaused = false;
+                initializeTimer();
+                alert('Có lỗi xảy ra khi lưu bài thi!');
+            }
+        })
+        .catch(err => {
+            console.error('Save and exit failed:', err);
+            isPaused = false;
+            initializeTimer();
+            alert('Không thể lưu bài thi!');
+        });
+    }
+
+    function confirmRestartExam() {
+        const modal = new bootstrap.Modal(document.getElementById('restartExamModal'));
+        modal.show();
+
+        updateRestartModalStats();
+    }
+
+    function updateRestartModalStats() {
+        const answeredCount = Object.keys(userAnswers).length;
+        document.getElementById('restart-answered-count').textContent = answeredCount;
+
+        const totalTime = {{ exam.duration }} * 60;
+        const usedTime = totalTime - timeRemaining;
+        const usedMinutes = Math.floor(usedTime / 60);
+        const usedSeconds = usedTime % 60;
+
+        let timeText = '';
+        if (usedMinutes > 0) {
+            timeText = `${usedMinutes} phút`;
+            if (usedSeconds > 0) {
+                timeText += ` ${usedSeconds} giây`;
+            }
+        } else {
+            timeText = `${Math.max(0, usedSeconds)} giây`;
+        }
+
+        document.getElementById('restart-time-used').textContent = timeText;
     }
 </script>
 {% endblock %}

@@ -1,0 +1,405 @@
+{% extends 'layout/base.html' %}
+
+{% block content %}
+<section class="py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="card border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
+                    <div class="card-header border-0 text-white text-center py-4"
+                         style="background: linear-gradient(135deg, #384AD5, #5B6CF0);">
+                        <div class="bg-white bg-opacity-20 rounded-circle d-inline-flex align-items-center justify-content-center mb-3 text-dark"
+                             style="width: 80px; height: 80px;">
+                            <i class="bi bi-pencil" style="font-size: 2.5rem;"></i>
+                        </div>
+                        <h3 class="fw-bold mb-2">Tạo Đề Thi Thủ Công</h3>
+                        <p class="mb-0 opacity-90">Tự tạo câu hỏi và đáp án theo ý muốn</p>
+                    </div>
+
+                    <div class="card-body p-5">
+                        <form id="createExamForm">
+                            <!-- Thông tin cơ bản -->
+                            <div class="row mb-4">
+                                <div class="col-md-8">
+                                    <label for="examName" class="form-label fw-bold text-primary">
+                                        <i class="bi bi-file-earmark-text me-2"></i>Tên đề thi
+                                    </label>
+                                    <input type="text"
+                                           class="form-control form-control-lg border-2"
+                                           id="examName"
+                                           placeholder="Nhập tên đề thi..."
+                                           style="border-radius: 12px; border-color: #e0e7ff;"
+                                           required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="duration" class="form-label fw-bold text-primary">
+                                        <i class="bi bi-clock me-2"></i>Thời gian (phút)
+                                    </label>
+                                    <input type="number"
+                                           class="form-control form-control-lg border-2"
+                                           id="duration"
+                                           min="1"
+                                           max="300"
+                                           placeholder="Nhập thời gian..."
+                                           style="border-radius: 12px; border-color: #e0e7ff;"
+                                           required>
+                                    <small class="text-muted">Từ 1 đến 300 phút</small>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="subjectId" class="form-label fw-bold text-primary">
+                                    <i class="bi bi-book me-2"></i>Môn học
+                                </label>
+                                <select class="form-select form-select-lg border-2"
+                                        id="subjectId"
+                                        style="border-radius: 12px; border-color: #e0e7ff;"
+                                        required>
+                                    <option value="">Chọn môn học...</option>
+                                    {% for subject in subjects %}
+                                    <option value="{{ subject.id }}">{{ subject.subject_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- Danh sách câu hỏi -->
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <h5 class="fw-bold text-primary mb-0">
+                                    <i class="bi bi-question-circle me-2"></i>Danh Sách Câu Hỏi
+                                </h5>
+                                <button type="button"
+                                        class="btn btn-primary btn-lg px-4 py-2"
+                                        onclick="addQuestion()"
+                                        style="background: linear-gradient(135deg, #384AD5, #5B6CF0); border: none; border-radius: 12px;">
+                                    <i class="bi bi-plus-circle me-2"></i>Thêm câu hỏi
+                                </button>
+                            </div>
+
+                            <div id="questionsContainer">
+                                <!-- Câu hỏi sẽ được thêm vào đây -->
+                            </div>
+
+                            <!-- Thông tin bổ sung -->
+                            <div class="alert alert-info border-0 mb-4"
+                                 style="background: linear-gradient(135deg, #e3f2fd, #f3e5f5); border-radius: 12px;">
+                                <div class="d-flex align-items-start">
+                                    <i class="bi bi-info-circle-fill text-primary me-3 mt-1"></i>
+                                    <div>
+                                        <h6 class="fw-bold text-primary mb-2">Hướng dẫn tạo đề thi:</h6>
+                                        <ul class="mb-0 small text-primary">
+                                            <li>Mỗi câu hỏi phải có ít nhất 2 đáp án</li>
+                                            <li>Chỉ được chọn 1 đáp án đúng cho mỗi câu hỏi</li>
+                                            <li>Có thể thêm nhiều đáp án cho mỗi câu hỏi</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Buttons -->
+                            <div class="d-flex gap-3 justify-content-between">
+                                <a href="{{ url_for('user_exams') }}"
+                                   class="btn btn-outline-secondary btn-lg px-4 py-2"
+                                   style="border-radius: 12px;">
+                                    <i class="bi bi-arrow-left me-2"></i>Quay lại
+                                </a>
+
+                                <button type="submit"
+                                        class="btn btn-primary btn-lg px-4 py-2 position-relative"
+                                        style="background: linear-gradient(135deg, #384AD5, #5B6CF0); border: none; border-radius: 12px;"
+                                        id="submitBtn">
+                                    <span id="submitText">
+                                        <i class="bi bi-check-circle me-2"></i>Tạo đề thi
+                                    </span>
+                                    <span id="loadingText" style="display: none;">
+                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                        Đang tạo...
+                                    </span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+let questionCount = 0;
+
+function addQuestion() {
+    questionCount++;
+    const questionHtml = `
+        <div class="question-item card border-0 shadow-sm mb-4" id="question-${questionCount}" style="border-radius: 15px; overflow: hidden;">
+            <div class="card-header border-0 d-flex justify-content-between align-items-center py-3"
+                 style="background: linear-gradient(135deg, #f8fafc, #e2e8f0);">
+                <h6 class="mb-0 fw-bold text-primary">
+                    <i class="bi bi-question-circle me-2"></i>Câu hỏi ${questionCount}
+                </h6>
+                <button type="button"
+                        class="btn btn-outline-danger btn-sm"
+                        onclick="removeQuestion(${questionCount})"
+                        style="border-radius: 8px;">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+            <div class="card-body p-4">
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-primary">
+                        <i class="bi bi-chat-text me-2"></i>Nội dung câu hỏi <span class="text-danger">*</span>
+                    </label>
+                    <textarea class="form-control form-control-lg border-2"
+                              rows="3"
+                              placeholder="Nhập nội dung câu hỏi..."
+                              style="border-radius: 12px; border-color: #e0e7ff;"
+                              required></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-primary">
+                        <i class="bi bi-list-check me-2"></i>Đáp án
+                    </label>
+                    <div class="answers-container">
+                        <div class="answer-item mb-3">
+                            <div class="input-group input-group-lg">
+                                <div class="input-group-text" style="border-radius: 12px 0 0 12px; border-color: #e0e7ff; background: #f8fafc;">
+                                    <input type="radio" name="correct-${questionCount}" value="0" style="transform: scale(1.2);">
+                                </div>
+                                <input type="text" class="form-control border-2" placeholder="Nhập đáp án" style="border-color: #e0e7ff;" required>
+                                <button type="button" class="btn btn-outline-danger" onclick="removeAnswer(this)" disabled style="border-radius: 0 12px 12px 0; border-color: #e0e7ff;">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="answer-item mb-3">
+                            <div class="input-group input-group-lg">
+                                <div class="input-group-text" style="border-radius: 12px 0 0 12px; border-color: #e0e7ff; background: #f8fafc;">
+                                    <input type="radio" name="correct-${questionCount}" value="1" style="transform: scale(1.2);">
+                                </div>
+                                <input type="text" class="form-control border-2" placeholder="Nhập đáp án" style="border-color: #e0e7ff;" required>
+                                <button type="button" class="btn btn-outline-danger" onclick="removeAnswer(this)" disabled style="border-radius: 0 12px 12px 0; border-color: #e0e7ff;">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <button type="button"
+                            class="btn btn-outline-primary px-3 py-2"
+                            onclick="addAnswer(${questionCount})"
+                            style="border-radius: 10px;">
+                        <i class="bi bi-plus-circle me-1"></i>Thêm đáp án
+                    </button>
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle me-1"></i>Chọn ô để đánh dấu đáp án đúng
+                    </small>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('questionsContainer').insertAdjacentHTML('beforeend', questionHtml);
+    updateAnswerButtons(questionCount);
+}
+
+function removeQuestion(questionId) {
+    document.getElementById(`question-${questionId}`).remove();
+    renumberQuestions();
+}
+
+function addAnswer(questionId) {
+    const questionElement = document.getElementById(`question-${questionId}`);
+    const answersContainer = questionElement.querySelector('.answers-container');
+    const answerCount = answersContainer.children.length;
+
+    const answerHtml = `
+        <div class="answer-item mb-3">
+            <div class="input-group input-group-lg">
+                <div class="input-group-text" style="border-radius: 12px 0 0 12px; border-color: #e0e7ff; background: #f8fafc;">
+                    <input type="radio" name="correct-${questionId}" value="${answerCount}" style="transform: scale(1.2);">
+                </div>
+                <input type="text" class="form-control border-2" placeholder="Nhập đáp án" style="border-color: #e0e7ff;" required>
+                <button type="button" class="btn btn-outline-danger" onclick="removeAnswer(this)" style="border-radius: 0 12px 12px 0; border-color: #e0e7ff;">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+
+    answersContainer.insertAdjacentHTML('beforeend', answerHtml);
+    updateAnswerButtons(questionId);
+}
+
+function removeAnswer(button) {
+    const questionElement = button.closest('.question-item');
+    const answersContainer = questionElement.querySelector('.answers-container');
+
+    button.closest('.answer-item').remove();
+
+    const radioButtons = answersContainer.querySelectorAll('input[type="radio"]');
+    radioButtons.forEach((radio, index) => {
+        radio.value = index;
+    });
+
+    const questionId = questionElement.id.split('-')[1];
+    updateAnswerButtons(questionId);
+}
+
+function updateAnswerButtons(questionId) {
+    const questionElement = document.getElementById(`question-${questionId}`);
+    const answersContainer = questionElement.querySelector('.answers-container');
+    const removeButtons = answersContainer.querySelectorAll('.btn-outline-danger');
+
+    // Chỉ cho phép xóa khi có nhiều hơn 2 đáp án
+    removeButtons.forEach(button => {
+        button.disabled = answersContainer.children.length <= 2;
+    });
+}
+
+function renumberQuestions() {
+    const questions = document.querySelectorAll('.question-item');
+    questionCount = questions.length;
+
+    questions.forEach((question, index) => {
+        const newNumber = index + 1;
+        const newId = `question-${newNumber}`;
+
+        question.id = newId;
+
+        const header = question.querySelector('.card-header h6');
+        header.innerHTML = `<i class="bi bi-question-circle me-2"></i>Câu hỏi ${newNumber}`;
+
+        const removeBtn = question.querySelector('.card-header button');
+        removeBtn.setAttribute('onclick', `removeQuestion(${newNumber})`);
+
+        const radioButtons = question.querySelectorAll('input[type="radio"]');
+        radioButtons.forEach((radio, radioIndex) => {
+            radio.name = `correct-${newNumber}`;
+            radio.value = radioIndex;
+        });
+
+        const addAnswerBtn = question.querySelector('.btn-outline-primary');
+        addAnswerBtn.setAttribute('onclick', `addAnswer(${newNumber})`);
+    });
+}
+
+document.getElementById('createExamForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const examName = document.getElementById('examName').value.trim();
+    const duration = parseInt(document.getElementById('duration').value);
+    const subjectId = parseInt(document.getElementById('subjectId').value);
+
+    if (!examName || !duration || !subjectId) {
+        alert('Vui lòng điền đầy đủ thông tin cơ bản!');
+        return;
+    }
+
+    const questions = [];
+    const questionElements = document.querySelectorAll('.question-item');
+
+    if (questionElements.length === 0) {
+        alert('Vui lòng thêm ít nhất 1 câu hỏi!');
+        return;
+    }
+
+    let hasError = false;
+
+    questionElements.forEach((questionElement, index) => {
+        const questionTitle = questionElement.querySelector('textarea').value.trim();
+        const answerInputs = questionElement.querySelectorAll('.answer-item input[type="text"]');
+        const correctRadio = questionElement.querySelector('input[type="radio"]:checked');
+
+        if (!questionTitle) {
+            alert(`Vui lòng nhập nội dung cho câu hỏi ${index + 1}!`);
+            hasError = true;
+            return;
+        }
+
+        if (!correctRadio) {
+            alert(`Vui lòng chọn đáp án đúng cho câu hỏi ${index + 1}!`);
+            hasError = true;
+            return;
+        }
+
+        const answers = [];
+        let hasEmptyAnswer = false;
+
+        answerInputs.forEach((input, answerIndex) => {
+            const answerText = input.value.trim();
+            if (!answerText) {
+                hasEmptyAnswer = true;
+                return;
+            }
+
+            answers.push({
+                answer_text: answerText,
+                is_correct: parseInt(correctRadio.value) === answerIndex
+            });
+        });
+
+        if (hasEmptyAnswer) {
+            alert(`Vui lòng điền đầy đủ các đáp án cho câu hỏi ${index + 1}!`);
+            hasError = true;
+            return;
+        }
+
+        if (answers.length < 2) {
+            alert(`Câu hỏi ${index + 1} phải có ít nhất 2 đáp án!`);
+            hasError = true;
+            return;
+        }
+
+        questions.push({
+            question_title: questionTitle,
+            answers: answers
+        });
+    });
+
+    if (hasError) return;
+
+    // Hiển thị loading
+    const submitButton = this.querySelector('button[type="submit"]');
+    const originalText = submitButton.innerHTML;
+    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang tạo...';
+    submitButton.disabled = true;
+
+    fetch('/create-exam', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            exam_name: examName,
+            subject_id: subjectId,
+            duration: duration,
+            questions: questions
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            window.location.href = data.redirect_url;
+        } else {
+            alert(data.error || 'Có lỗi xảy ra!');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Có lỗi xảy ra khi tạo đề thi!');
+    })
+    .finally(() => {
+        submitButton.innerHTML = originalText;
+        submitButton.disabled = false;
+    });
+});
+
+// Thêm câu hỏi đầu tiên khi tải trang
+document.addEventListener('DOMContentLoaded', function() {
+    addQuestion();
+});
+</script>
+{% endblock %}
