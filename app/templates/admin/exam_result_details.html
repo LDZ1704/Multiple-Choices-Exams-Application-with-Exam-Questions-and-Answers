@@ -1,0 +1,90 @@
+{% extends 'admin/master.html' %}
+
+{% block body %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="page-title">Chi tiết kết quả thi</h2>
+    <a href="{{ return_url }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-2"></i>Quay lại
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-person me-2"></i>Thông tin học sinh</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Họ tên:</strong> {{ model.student.user.name if model.student and model.student.user else 'N/A' }}</p>
+                <p><strong>Email:</strong> {{ model.student.user.email if model.student and model.student.user else 'N/A' }}</p>
+                <p><strong>Thời gian thi:</strong> {{ model.taken_exam.strftime('%d/%m/%Y %H:%M:%S') if model.taken_exam else 'N/A' }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-file-text me-2"></i>Thông tin đề thi</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Tên đề thi:</strong> {{ model.exam.exam_name if model.exam else 'N/A' }}</p>
+                <p><strong>Môn học:</strong> {{ model.exam.subject.subject_name if model.exam and model.exam.subject else 'N/A' }}</p>
+                <p><strong>Thời gian:</strong> {{ model.exam.duration if model.exam else 'N/A' }} phút</p>
+                <p><strong>Điểm số:</strong> <span class="badge bg-primary fs-6">{{ model.score }}/100</span></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if model.user_answers %}
+<div class="card mt-4">
+    <div class="card-header">
+        <h5><i class="bi bi-list me-2"></i>Chi tiết câu trả lời</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>STT</th>
+                        <th>Câu hỏi</th>
+                        <th>Đáp án của học sinh</th>
+                        <th>Đáp án đúng</th>
+                        <th>Kết quả</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for question_id, answer_id in model.user_answers.items() %}
+                        {% set question = model.exam.exam_questions|selectattr('question_id', 'equalto', question_id|int)|first %}
+                        {% if question %}
+                            {% set user_answer = question.question.answers|selectattr('id', 'equalto', answer_id|int)|first %}
+                            {% set correct_answer = question.question.answers|selectattr('is_correct', 'equalto', true)|first %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>{{ question.question.question_title[:50] }}...</td>
+                                <td>
+                                    {% if user_answer %}
+                                        {{ user_answer.answer_text }}
+                                    {% else %}
+                                        <em class="text-muted">Không trả lời</em>
+                                    {% endif %}
+                                </td>
+                                <td>{{ correct_answer.answer_text if correct_answer else 'N/A' }}</td>
+                                <td>
+                                    {% if user_answer and user_answer.is_correct %}
+                                        <span class="badge bg-success">Đúng</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Sai</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

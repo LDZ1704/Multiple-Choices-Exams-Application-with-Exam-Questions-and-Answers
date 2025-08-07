@@ -3,7 +3,71 @@
 {% block title %}Thống kê - LmaoQuiz Admin{% endblock %}
 
 {% block body %}
-<h2 class="page-title">Thống kê và báo cáo</h2>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="page-title">Thống kê và báo cáo</h2>
+    <div>
+        <a href="{{ url_for('reports.export_data') }}" class="btn btn-success">
+            <i class="bi bi-download me-2"></i>Xuất CSV
+        </a>
+        <button class="btn btn-primary" onclick="window.print()">
+            <i class="bi bi-printer me-2"></i>In báo cáo
+        </button>
+    </div>
+</div>
+
+<!-- Summary Stats Row -->
+{% if total_stats %}
+<div class="row g-4 mb-4">
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h4 class="text-primary">{{ total_stats.total_exams }}</h4>
+                <small class="text-muted">Tổng đề thi</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h4 class="text-success">{{ total_stats.total_students }}</h4>
+                <small class="text-muted">Học sinh</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h4 class="text-info">{{ total_stats.total_attempts }}</h4>
+                <small class="text-muted">Lượt thi</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h4 class="text-warning">{{ total_stats.total_questions }}</h4>
+                <small class="text-muted">Câu hỏi</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h4 class="text-secondary">{{ total_stats.total_subjects }}</h4>
+                <small class="text-muted">Môn học</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h4 class="text-danger">{{ total_stats.total_comments }}</h4>
+                <small class="text-muted">Bình luận</small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- Charts Row -->
 <div class="row g-4 mb-4">
@@ -12,7 +76,7 @@
             <div class="card-header bg-white">
                 <h5 class="mb-0">
                     <i class="bi bi-bar-chart me-2"></i>
-                    Thống kê đề thi
+                    Thống kê đề thi (Top 10)
                 </h5>
             </div>
             <div class="card-body">
@@ -25,7 +89,7 @@
             <div class="card-header bg-white">
                 <h5 class="mb-0">
                     <i class="bi bi-pie-chart me-2"></i>
-                    Phân bố điểm số
+                    Phân bố điểm trung bình các thí sinh
                 </h5>
             </div>
             <div class="card-body">
@@ -35,15 +99,36 @@
     </div>
 </div>
 
-<!-- Exam Statistics Table -->
-<div class="row">
-    <div class="col-lg-8">
+<!-- Monthly Performance Chart -->
+{% if monthly_scores %}
+<div class="row mb-4">
+    <div class="col-12">
         <div class="card">
             <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-graph-up me-2"></i>
+                    Xu hướng điểm số theo tháng
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="monthlyChart" width="400" height="150"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Main Content Row -->
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Exam Statistics Table -->
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
                     <i class="bi bi-file-text me-2"></i>
                     Thống kê chi tiết đề thi
                 </h5>
+                <span class="badge bg-primary">{{ exam_stats|length if exam_stats else 0 }} đề thi</span>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
@@ -51,61 +136,39 @@
                         <thead>
                             <tr>
                                 <th>Tên đề thi</th>
-                                <th>Lượt thi</th>
+                                <th>Môn học</th>
+                                <th>Số lượt thi</th>
                                 <th>Điểm TB</th>
                                 <th>Điểm cao nhất</th>
                                 <th>Điểm thấp nhất</th>
-                                <th>Trạng thái</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% if exam_stats %}
-                                {% for stat in exam_stats %}
-                                <tr>
-                                    <td>
-                                        <strong>{{ stat.exam_name }}</strong>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-info">{{ stat.attempts or 0 }}</span>
-                                    </td>
-                                    <td>
-                                        {% if stat.avg_score %}
-                                            <span class="badge bg-primary">{{ "%.1f"|format(stat.avg_score) }}</span>
-                                        {% else %}
-                                            <span class="text-muted">N/A</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if stat.max_score %}
-                                            <span class="badge bg-success">{{ stat.max_score }}</span>
-                                        {% else %}
-                                            <span class="text-muted">N/A</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if stat.min_score %}
-                                            <span class="badge bg-warning">{{ stat.min_score }}</span>
-                                        {% else %}
-                                            <span class="text-muted">N/A</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if stat.attempts and stat.attempts > 0 %}
-                                            <span class="badge bg-success">Hoạt động</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">Chưa có lượt thi</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            {% else %}
+                            {% for stat in exam_stats %}
                             <tr>
-                                <td colspan="6" class="text-center text-muted">
-                                    <i class="bi bi-inbox display-4 d-block mb-3"></i>
-                                    Chưa có dữ liệu thống kê
+                                <td><strong>{{ stat.exam_name }}</strong></td>
+                                <td><span class="badge bg-info">{{ stat.subject_name }}</span></td>
+                                <td><span class="badge bg-primary">{{ stat.attempts or 0 }}</span></td>
+                                <td>
+                                    {% if stat.avg_score %}
+                                        {% set score = stat.avg_score %}
+                                        {% if score >= 8 %}
+                                            <span class="badge bg-success">{{ "%.1f"|format(score) }}</span>
+                                        {% elif score >= 6.5 %}
+                                            <span class="badge bg-primary">{{ "%.1f"|format(score) }}</span>
+                                        {% elif score >= 5 %}
+                                            <span class="badge bg-warning">{{ "%.1f"|format(score) }}</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">{{ "%.1f"|format(score) }}</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="badge bg-secondary">N/A</span>
+                                    {% endif %}
                                 </td>
+                                <td><span class="badge bg-success">{{ stat.max_score or "N/A" }}</span></td>
+                                <td><span class="badge bg-danger">{{ stat.min_score or "N/A" }}</span></td>
                             </tr>
-                            {% endif %}
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -119,84 +182,134 @@
             <div class="card-header bg-white">
                 <h5 class="mb-0">
                     <i class="bi bi-trophy me-2"></i>
-                    Thành tích cao
+                    Top 10 học sinh xuất sắc
                 </h5>
             </div>
             <div class="card-body">
-                {% if user_stats %}
-                    {% for user in user_stats[:5] %}
+                {% if top_students %}
+                    {% for student in top_students %}
                     <div class="d-flex align-items-center mb-3">
-                        <div class="bg-gradient bg-primary rounded-circle p-2 me-3" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
-                            <i class="bi bi-person text-white"></i>
+                        <div class="me-3">
+                            {% if loop.index <= 3 %}
+                                <div class="bg-warning rounded-circle p-2" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="bi bi-trophy text-white"></i>
+                                </div>
+                            {% else %}
+                                <div class="bg-primary rounded-circle p-2" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                                    <strong class="text-white">{{ loop.index }}</strong>
+                                </div>
+                            {% endif %}
                         </div>
                         <div class="flex-grow-1">
-                            <h6 class="mb-0">{{ user.name }}</h6>
+                            <h6 class="mb-0">{{ student.name }}</h6>
                             <small class="text-muted">
-                                {{ user.attempts }} lượt thi - TB: {{ "%.1f"|format(user.avg_score) if user.avg_score else "N/A" }}
+                                <i class="bi bi-graph-up me-1"></i>{{ student.total_exams }} lượt thi
                             </small>
                         </div>
                         <div>
-                            {% if user.avg_score %}
-                                {% if user.avg_score >= 80 %}
-                                    <span class="badge bg-success">Xuất sắc</span>
-                                {% elif user.avg_score >= 65 %}
-                                    <span class="badge bg-primary">Giỏi</span>
-                                {% elif user.avg_score >= 50 %}
-                                    <span class="badge bg-warning">Khá</span>
+                            {% if student.avg_score %}
+                                {% set score = student.avg_score %}
+                                {% if score >= 8 %}
+                                    <span class="badge bg-success">{{ "%.1f"|format(score) }}</span>
+                                {% elif score >= 6.5 %}
+                                    <span class="badge bg-primary">{{ "%.1f"|format(score) }}</span>
+                                {% elif score >= 5 %}
+                                    <span class="badge bg-warning">{{ "%.1f"|format(score) }}</span>
                                 {% else %}
-                                    <span class="badge bg-danger">Yếu</span>
+                                    <span class="badge bg-danger">{{ "%.1f"|format(score) }}</span>
                                 {% endif %}
                             {% endif %}
                         </div>
                     </div>
                     {% endfor %}
                 {% else %}
-                <div class="text-center text-muted">
+                <div class="text-center text-muted py-4">
                     <i class="bi bi-award display-6 d-block mb-3"></i>
                     <p>Chưa có dữ liệu thành tích</p>
+                    <small>Kết quả sẽ hiển thị khi có học sinh tham gia</small>
                 </div>
                 {% endif %}
             </div>
         </div>
 
-        <!-- Summary Stats -->
-        <div class="card">
+        <!-- Performance Analysis -->
+        <div class="card mb-4">
             <div class="card-header bg-white">
                 <h5 class="mb-0">
                     <i class="bi bi-graph-up me-2"></i>
-                    Tóm tắt
+                    Phân tích hiệu suất
                 </h5>
             </div>
             <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-6 mb-3">
-                        <h4 class="text-primary">{{ exam_stats|length if exam_stats else 0 }}</h4>
-                        <small class="text-muted">Đề thi có thống kê</small>
+                {% if exam_stats %}
+                    {% set total_attempts = exam_stats|sum(attribute='attempts') or 0 %}
+                    {% set exams_with_attempts = exam_stats|selectattr('attempts')|list %}
+                    {% set avg_score_all = (exams_with_attempts|sum(attribute='avg_score') / exams_with_attempts|length) if exams_with_attempts|length > 0 else 0 %}
+
+                    <div class="row text-center mb-3">
+                        <div class="col-6">
+                            <h4 class="text-primary">{{ total_attempts }}</h4>
+                            <small class="text-muted">Tổng lượt thi</small>
+                        </div>
+                        <div class="col-6">
+                            <h4 class="text-success">{{ "%.1f"|format(avg_score_all) }}</h4>
+                            <small class="text-muted">Điểm TB toàn hệ thống</small>
+                        </div>
                     </div>
-                    <div class="col-6 mb-3">
-                        <h4 class="text-success">{{ user_stats|length if user_stats else 0 }}</h4>
-                        <small class="text-muted">Học sinh tham gia</small>
+
+                    <div class="progress mb-3" style="height: 20px;">
+                        <div class="progress-bar bg-success" style="width: {{ ((avg_score_all/10)*100)|round|int if avg_score_all else 0 }}%">
+                            {{ "%.1f"|format(avg_score_all) }}/100
+                        </div>
                     </div>
-                    <div class="col-6">
-                        <h4 class="text-info">
-                            {% if exam_stats %}
-                                {{ exam_stats|sum(attribute='attempts') or 0 }}
+
+                    <!-- Performance Insights -->
+                    <div class="alert alert-info">
+                        <small>
+                            <i class="bi bi-lightbulb me-1"></i>
+                            <strong>Thông tin:</strong>
+                            {% if avg_score_all >= 8 %}
+                                Hệ thống đang hoạt động xuất sắc với điểm số rất cao!
+                            {% elif avg_score_all >= 6.5 %}
+                                Chất lượng giáo dục tốt, học sinh đạt kết quả khá cao.
+                            {% elif avg_score_all >= 5 %}
+                                Cần cải thiện chất lượng đề thi và phương pháp dạy học.
                             {% else %}
-                                0
+                                Cần xem xét lại toàn bộ hệ thống đề thi và nội dung.
                             {% endif %}
-                        </h4>
-                        <small class="text-muted">Tổng lượt thi</small>
+                        </small>
                     </div>
-                    <div class="col-6">
-                        <h4 class="text-warning">
-                            {% if user_stats %}
-                                {{ "%.1f"|format((user_stats|sum(attribute='avg_score') / user_stats|length) if user_stats|length > 0 else 0) }}
-                            {% else %}
-                                0.0
-                            {% endif %}
-                        </h4>
-                        <small class="text-muted">Điểm TB chung</small>
+                {% else %}
+                    <div class="text-center text-muted">
+                        <i class="bi bi-graph-up display-6 d-block mb-3"></i>
+                        <p>Chưa có dữ liệu phân tích</p>
                     </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-tools me-2"></i>
+                    Thao tác nhanh
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('examresult.index_view') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-list-ul me-2"></i>Xem tất cả kết quả thi
+                    </a>
+                    <a href="{{ url_for('exam.index_view') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-file-text me-2"></i>Quản lý đề thi
+                    </a>
+                    <a href="{{ url_for('user.index_view') }}" class="btn btn-outline-info">
+                        <i class="bi bi-people me-2"></i>Xem danh sách học sinh
+                    </a>
+                    <button class="btn btn-outline-success" onclick="refreshStats()">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Làm mới thống kê
+                    </button>
                 </div>
             </div>
         </div>
@@ -215,16 +328,27 @@
             </div>
             <div class="card-body">
                 <p class="text-muted mb-3">Xuất dữ liệu thống kê dưới các định dạng khác nhau:</p>
-                <div class="btn-group" role="group">
-                    <button type="button" class="btn btn-outline-success">
-                        <i class="bi bi-file-earmark-excel me-2"></i>Excel
-                    </button>
-                    <button type="button" class="btn btn-outline-danger">
-                        <i class="bi bi-file-earmark-pdf me-2"></i>PDF
-                    </button>
-                    <button type="button" class="btn btn-outline-info">
-                        <i class="bi bi-file-earmark-text me-2"></i>CSV
-                    </button>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="d-grid gap-2">
+                            <a href="{{ url_for('reports.export_data') }}" class="btn btn-success">
+                                <i class="bi bi-file-earmark-excel me-2"></i>Xuất Excel/CSV
+                            </a>
+                            <button type="button" class="btn btn-outline-danger" onclick="exportToPDF()">
+                                <i class="bi bi-file-earmark-pdf me-2"></i>Xuất PDF
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-outline-info" onclick="window.print()">
+                                <i class="bi bi-printer me-2"></i>In báo cáo
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="shareReport()">
+                                <i class="bi bi-share me-2"></i>Chia sẻ báo cáo
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -240,7 +364,7 @@
             labels: [
                 {% if exam_stats %}
                     {% for stat in exam_stats[:10] %}
-                        '{{ stat.exam_name[:20] }}{% if stat.exam_name|length > 20 %}...{% endif %}'{% if not loop.last %},{% endif %}
+                        '{{ stat.exam_name[:15] }}{% if stat.exam_name|length > 15 %}...{% endif %}'{% if not loop.last %},{% endif %}
                     {% endfor %}
                 {% endif %}
             ],
@@ -255,7 +379,8 @@
                 ],
                 backgroundColor: 'rgba(102, 126, 234, 0.8)',
                 borderColor: 'rgba(102, 126, 234, 1)',
-                borderWidth: 1
+                borderWidth: 1,
+                borderRadius: 4
             }]
         },
         options: {
@@ -263,11 +388,29 @@
             plugins: {
                 legend: {
                     display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            const index = context[0].dataIndex;
+                            const examNames = [
+                                {% if exam_stats %}
+                                    {% for stat in exam_stats[:10] %}
+                                        '{{ stat.exam_name }}'{% if not loop.last %},{% endif %}
+                                    {% endfor %}
+                                {% endif %}
+                            ];
+                            return examNames[index];
+                        }
+                    }
                 }
             },
             scales: {
                 y: {
-                    beginAtZero: true
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
                 }
             }
         }
@@ -275,19 +418,38 @@
 
     // Score Distribution Chart
     const scoreDistCtx = document.getElementById('scoreDistributionChart').getContext('2d');
+
+    // Calculate score distribution from data
+    let excellent = 0, good = 0, fair = 0, poor = 0;
+    {% if user_stats %}
+        {% for user in user_stats %}
+            {% if user.avg_score %}
+                {% if user.avg_score >= 80 %}
+                    excellent++;
+                {% elif user.avg_score >= 65 %}
+                    good++;
+                {% elif user.avg_score >= 40 %}
+                    fair++;
+                {% else %}
+                    poor++;
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
     new Chart(scoreDistCtx, {
         type: 'doughnut',
         data: {
-            labels: ['Xuất sắc (80-100)', 'Giỏi (65-79)', 'Khá (50-64)', 'Yếu (<50)'],
+            labels: ['Xuất sắc (≥80)', 'Giỏi (65-79)', 'Khá (40-64)', 'Yếu (<40)'],
             datasets: [{
-                data: [25, 35, 30, 10], // Mock data - replace with real calculation
+                data: [excellent, good, fair, poor],
                 backgroundColor: [
                     'rgba(40, 167, 69, 0.8)',
                     'rgba(0, 123, 255, 0.8)',
                     'rgba(255, 193, 7, 0.8)',
                     'rgba(220, 53, 69, 0.8)'
                 ],
-                borderWidth: 2,
+                borderWidth: 3,
                 borderColor: '#fff'
             }]
         },
@@ -296,9 +458,129 @@
             plugins: {
                 legend: {
                     position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? ((context.parsed * 100) / total).toFixed(1) : 0;
+                            return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                        }
+                    }
                 }
             }
         }
     });
+
+    {% if monthly_scores %}
+    // Monthly Performance Chart - đã sửa
+    const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+    new Chart(monthlyCtx, {
+        type: 'line',
+        data: {
+            labels: [
+                {% for score in monthly_scores %}
+                    '{{ score.month }}'{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ],
+            datasets: [{
+                label: 'Điểm trung bình',
+                data: [
+                    {% for score in monthly_scores %}
+                        {{ score.avg_score|round(1) if score.avg_score else 0 }}{% if not loop.last %},{% endif %}
+                    {% endfor %}
+                ],
+                borderColor: 'rgba(75, 192, 192, 1)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y'
+            }, {
+                label: 'Số lượt thi',
+                data: [
+                    {% for score in monthly_scores %}
+                        {{ score.attempts or 0 }}{% if not loop.last %},{% endif %}
+                    {% endfor %}
+                ],
+                borderColor: 'rgba(255, 99, 132, 1)',
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                borderWidth: 2,
+                yAxisID: 'y1',
+                type: 'bar'
+            }]
+        },
+        options: {
+            responsive: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                x: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Tháng'
+                    }
+                },
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    beginAtZero: true,
+                    max: 10,
+                    title: {
+                        display: true,
+                        text: 'Điểm trung bình'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Số lượt thi'
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Xu hướng điểm số và lượt thi theo tháng'
+                },
+                legend: {
+                    position: 'top'
+                }
+            }
+        }
+    });
+    {% endif %}
+
+    // Utility functions
+    function refreshStats() {
+        location.reload();
+    }
+
+    function exportToPDF() {
+        window.print();
+    }
+
+    function shareReport() {
+        if (navigator.share) {
+            navigator.share({
+                title: 'Báo cáo thống kê LmaoQuiz',
+                url: window.location.href
+            });
+        } else {
+            navigator.clipboard.writeText(window.location.href);
+            alert('Link báo cáo đã được copy vào clipboard!');
+        }
+    }
 </script>
 {% endblock %}

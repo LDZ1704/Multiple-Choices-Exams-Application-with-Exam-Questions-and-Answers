@@ -130,3 +130,13 @@
     background-color: #667eea;
     border-color: #667eea;
 }
+
+@media print {
+    .btn, .card-header .btn, .no-print {
+        display: none !important;
+    }
+    .card {
+        border: 1px solid #ddd !important;
+        break-inside: avoid;
+    }
+}
