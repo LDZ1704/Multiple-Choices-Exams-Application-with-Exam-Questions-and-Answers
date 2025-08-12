@@ -16,13 +16,10 @@
         <div class="col-md-6 d-flex align-items-center justify-content-center">
             <div class="w-75">
                 <h3 class="mb-4 text-center">Đăng nhập</h3>
-                {% if err_message %}
-                <div class="alert alert-danger">{{ err_message }}</div>
-                {% endif %}
                 <form method="post">
                     <div class="mb-3">
                         <label for="email" class="form-label">Tài khoản đăng nhập</label>
-                        <input name="username" class="form-control" id="email" placeholder="Nhập email hoặc tài khoản" required>
+                        <input name="username" class="form-control" id="email" placeholder="Nhập email hoặc tài khoản" value="{{ username }}" required>
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">Mật khẩu</label>

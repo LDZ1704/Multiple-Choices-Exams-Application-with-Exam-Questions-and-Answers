@@ -11,6 +11,7 @@
             integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
             crossorigin="anonymous"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/flash-message.css') }}">
     <link rel="icon" type="image/jpg" href="{{ url_for('static', filename='images/logo.jpg') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
@@ -22,27 +23,35 @@
 {% include 'layout/header.html' %}
 {% block content %}
 {% endblock %}
-<button type="button" class="btn btn-success position-fixed bottom-0 end-0 m-3 rounded-circle"
-        id="scrollToTop" style="display: none; width: 50px; height: 50px; z-index: 1000;">
+
+<button type="button" class="btn btn-success position-fixed bottom-0 end-0 m-3 rounded-circle" id="scrollToTop" style="display: none; width: 50px; height: 50px; z-index: 1000;">
     <i class="bi bi-arrow-up"></i>
 </button>
 
-<!-- Flash Messages -->
+<!-- Flash Messages Container -->
+<div id="flashOverlay" class="flash-overlay" onclick="closeFlashMessages(event)">
+    <div class="flash-modal" onclick="event.stopPropagation()">
+        <button class="flash-close" onclick="closeFlashMessages()">&times;</button>
+        <div id="flashContainer">
+            <!-- Flash messages will be inserted here -->
+        </div>
+        <div class="flash-buttons">
+            <button class="flash-btn flash-btn-primary" onclick="closeFlashMessages()">Đóng</button>
+        </div>
+    </div>
+</div>
 {% with messages = get_flashed_messages(with_categories=true) %}
 {% if messages %}
-<div class="position-fixed top-0 end-0 p-3" style="z-index: 1050">
+<div id="flaskMessages" style="display: none;">
     {% for category, message in messages %}
-    <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show flash-alert"
-         role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
+    <div data-category="{{ category }}" data-message="{{ message }}"></div>
     {% endfor %}
 </div>
 {% endif %}
 {% endwith %}
 
 {% include 'layout/footer.html' %}
-<script src="../../static/js/main.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/flash-message.js') }}"></script>
 </body>
 </html>

@@ -8,7 +8,7 @@
 
     <div class="d-flex gap-2">
         {% if admin_view.can_create %}
-        <a href="{{ get_url('.create_view', url=return_url) }}" class="btn btn-primary">
+        <a href="{{ admin_view.get_url('.create_view', url=return_url) }}" class="btn btn-primary">
             <i class="bi bi-plus-circle me-2"></i>Thêm mới
         </a>
         {% endif %}
@@ -42,7 +42,7 @@
                             <i class="bi bi-search"></i>
                         </button>
                     </div>
-                    {% for flt, flt_name, value in active_filters %}
+                    {% for flt, flt_name, op, value in active_filters %}
                     <input type="hidden" name="{{ flt }}" value="{{ value }}">
                     {% endfor %}
                 </form>
@@ -75,7 +75,7 @@
         {% if active_filters %}
         <div class="mt-3">
             <span class="text-muted me-2">Bộ lọc đang áp dụng:</span>
-            {% for flt, flt_name, value in active_filters %}
+            {% for flt, flt_name, op, value in active_filters %}
             <span class="badge bg-secondary me-1">
                         {{ flt_name }}: {{ value }}
                         <a href="{{ get_filter_url(flt, None) }}" class="text-white ms-1">
@@ -145,16 +145,36 @@
 
                     {% for c, name in list_columns %}
                     <td>
-                        {% if admin_view.is_editable(c) %}
-                        {% if admin_view.can_edit %}
-                        <a href="{{ get_url('.edit_view', id=get_pk_value(row), url=return_url) }}">
-                            {{ get_value(row, c) }}
-                        </a>
-                        {% else %}
-                        {{ get_value(row, c) }}
+                        {% set cell_value = get_value(row, c) %}
+
+                        {% if admin_view.is_editable(c) and admin_view.can_edit %}
+                        <a href="{{ admin_view.get_url('.edit_view', id=get_pk_value(row), url=return_url) }}">
                         {% endif %}
+
+                        {% if c == 'password' %}
+                            <span class="text-muted">••••••••</span>
+                        {% elif c == 'subject.subject_name' and cell_value %}
+                            {{ cell_value }}
+                        {% elif c == 'role' and 'ADMIN' in cell_value|string %}
+                            <span class="badge bg-danger">Admin</span>
+                        {% elif c == 'role' and 'STUDENT' in cell_value|string %}
+                            <span class="badge bg-primary">Học sinh</span>
+                        {% elif c == 'gender' and cell_value == 'Male' %}
+                            <span class="badge bg-info">Nam</span>
+                        {% elif c == 'gender' and cell_value == 'Female' %}
+                            <span class="badge bg-warning">Nữ</span>
+                        {% elif c == 'is_correct' and cell_value %}
+                            <span class="badge bg-success">Đúng</span>
+                        {% elif c == 'is_correct' and not cell_value %}
+                            <span class="badge bg-secondary">Sai</span>
+                        {% elif c == 'duration' and cell_value %}
+                            {{ cell_value }} phút
                         {% else %}
-                        {{ get_value(row, c) }}
+                            {{ cell_value if cell_value is not none else '' }}
+                        {% endif %}
+
+                        {% if admin_view.is_editable(c) and admin_view.can_edit %}
+                        </a>
                         {% endif %}
                     </td>
                     {% endfor %}
@@ -163,23 +183,19 @@
                     <td class="text-end">
                         <div class="btn-group btn-group-sm" role="group">
                             {% if admin_view.can_view_details %}
-                            <a href="{{ get_url('.details_view', id=get_pk_value(row), url=return_url) }}"
-                               class="btn btn-outline-primary"
-                               title="Xem chi tiết">
+                            <a href="{{ admin_view.get_url('.details_view', id=get_pk_value(row), url=return_url) }}" class="btn btn-outline-primary" title="Xem chi tiết">
                                 <i class="bi bi-eye"></i>
                             </a>
                             {% endif %}
 
                             {% if admin_view.can_edit %}
-                            <a href="{{ get_url('.edit_view', id=get_pk_value(row), url=return_url) }}"
-                               class="btn btn-outline-warning"
-                               title="Chỉnh sửa">
+                            <a href="{{ admin_view.get_url('.edit_view', id=get_pk_value(row), url=return_url) }}" class="btn btn-outline-warning" title="Chỉnh sửa">
                                 <i class="bi bi-pencil"></i>
                             </a>
                             {% endif %}
 
                             {% if admin_view.can_delete %}
-                            <form style="display: inline;" method="POST" action="{{ get_url('.delete_view', id=get_pk_value(row), url=return_url) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa?')">
+                            <form style="display: inline;" method="POST" action="{{ admin_view.get_url('.delete_view', id=get_pk_value(row), url=return_url) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa?')">
                                 <button type="submit" class="btn btn-outline-danger" title="Xóa">
                                     <i class="bi bi-trash"></i>
                                 </button>
@@ -257,7 +273,7 @@
                 {% endif %}
             </p>
             {% if admin_view.can_create %}
-            <a href="{{ get_url('.create_view', url=return_url) }}" class="btn btn-primary">
+            <a href="{{ admin_view.get_url('.create_view', url=return_url) }}" class="btn btn-primary">
                 <i class="bi bi-plus-circle me-2"></i>Thêm bản ghi đầu tiên
             </a>
             {% endif %}
@@ -288,6 +304,55 @@
 {% endif %}
 
 <script>
+    function formatCellValue(column, value, row) {
+    if (!value && value !== 0) return '<span class="text-muted">N/A</span>';
+
+    switch(column) {
+        case 'role':
+            if (value.includes('ADMIN')) return '<span class="badge bg-danger">Admin</span>';
+            if (value.includes('STUDENT')) return '<span class="badge bg-primary">Học sinh</span>';
+            return value;
+
+        case 'gender':
+            if (value === 'Male') return '<span class="badge bg-info">Nam</span>';
+            if (value === 'Female') return '<span class="badge bg-warning">Nữ</span>';
+            return value;
+
+        case 'is_correct':
+            return value === 'True' || value === true ?
+                '<span class="badge bg-success">Đúng</span>' :
+                '<span class="badge bg-secondary">Sai</span>';
+
+        case 'score':
+            const score = parseFloat(value);
+            const badgeClass = score >= 80 ? 'success' : score >= 65 ? 'warning' : 'danger';
+            return `<span class="badge bg-${badgeClass}">${score}/100</span>`;
+
+        case 'duration':
+            return `${value} phút`;
+
+        case 'password':
+            return '<span class="text-muted">••••••••</span>';
+
+        default:
+            if (column.includes('At') || column.includes('_at')) {
+                // Format date
+                try {
+                    const date = new Date(value);
+                    return date.toLocaleDateString('vi-VN') + ' ' + date.toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'});
+                } catch(e) {
+                    return value;
+                }
+            }
+
+            if (typeof value === 'string' && value.length > 50) {
+                return `<span title="${value}">${value.substring(0, 50)}...</span>`;
+            }
+
+            return value;
+    }
+}
+
     // Actions functionality
     {% if actions %}
         function performAction(name) {
@@ -303,7 +368,7 @@
 
             $('#actions-modal').modal('show');
             $('#actions-confirm').off('click').on('click', function() {
-                var form = $('<form method="POST" action="{{ get_url(".action_view") }}">');
+                var form = $('<form method="POST" action="{{ admin_view.get_url(".action_view") }}">');
                 form.append($('<input type="hidden" name="action" value="' + name + '">'));
                 form.append($('<input type="hidden" name="url" value="{{ return_url }}">'));
 

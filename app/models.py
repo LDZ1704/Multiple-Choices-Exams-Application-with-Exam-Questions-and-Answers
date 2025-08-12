@@ -8,7 +8,7 @@ from app import app, db
 
 
 class Role(RoleEnum):
-    ADMIN = 1,
+    ADMIN = 1
     STUDENT = 2
 
 
@@ -27,8 +27,8 @@ class User(Base, UserMixin):
                     default="https://res.cloudinary.com/denmq54ke/image/upload/v1752161601/login_register_d1oj9t.png")
     role = Column(Enum(Role), default=Role.STUDENT)
     gender = Column(String(6), nullable=False)
-    createdAt = Column(DateTime, default=datetime.datetime.now())
-    updateAt = Column(DateTime, default=datetime.datetime.now(), onupdate=datetime.datetime.now())
+    createdAt = Column(DateTime, default=datetime.datetime.now)
+    updateAt = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
     student = relationship("Student", back_populates="user", uselist=False)
     admin = relationship("Admin", back_populates="user", uselist=False)
@@ -77,7 +77,7 @@ class Exam(Base):
     start_time = Column(DateTime, nullable=True)
     end_time = Column(DateTime, nullable=True)
     createBy = Column(String(50), nullable=False)
-    createAt = Column(DateTime, nullable=False, default=datetime.datetime.now())
+    createAt = Column(DateTime, nullable=False, default=datetime.datetime.now)
     user_id = Column(Integer, ForeignKey('user.id'), nullable=False)
 
     subject = relationship("Subject", back_populates="exams")
@@ -88,9 +88,9 @@ class Exam(Base):
 
 
 class Question(Base):
-    question_title = Column(String(100), nullable=False, unique=True)
+    question_title = Column(String(500), nullable=False, unique=True)
     createBy = Column(String(50), nullable=False)
-    createAt = Column(DateTime, nullable=False, default=datetime.datetime.now())
+    createAt = Column(DateTime, nullable=False, default=datetime.datetime.now)
     chapter_id = Column(Integer, ForeignKey('chapter.id'), nullable=False)
     user_id = Column(Integer, ForeignKey('user.id'), nullable=False)
 
@@ -116,8 +116,10 @@ class ExamResult(Base):
     student_id = Column(Integer, ForeignKey('student.id'), nullable=False)
     exam_id = Column(Integer, ForeignKey('exam.id'), nullable=False)
     score = Column(Integer, nullable=False, default=0)
-    taken_exam = Column(DateTime, nullable=False, default=datetime.datetime.now())
-    user_answers = db.Column(JSON)
+    taken_exam = Column(DateTime, nullable=False, default=datetime.datetime.now)
+    time_taken = Column(Integer, nullable=True, default=0)  #(giây)
+    user_answers = Column(JSON)
+    is_first_attempt = Column(Boolean, default=True)
 
     student = relationship("Student", back_populates="exam_results")
     exam = relationship("Exam", back_populates="exam_results")
@@ -135,12 +137,14 @@ class ExamQuestions(Base):
 class ExamSession(Base):
     student_id = Column(Integer, ForeignKey('student.id'), nullable=False)
     exam_id = Column(Integer, ForeignKey('exam.id'), nullable=False)
-    start_time = Column(DateTime, nullable=False, default=datetime.datetime.now())
+    start_time = Column(DateTime, nullable=False, default=datetime.datetime.now)
     pause_time = Column(DateTime, nullable=True)
     resume_time = Column(DateTime, nullable=True)
     total_paused_duration = Column(Integer, default=0)  #seconds
     current_question_index = Column(Integer, default=0)
-    user_answers = Column(JSON, default={})
+    user_answers = Column(JSON, default=dict)
+    question_order = Column(JSON, default=[])
+    answer_orders = Column(JSON, default={})
     is_paused = Column(Boolean, default=False)
     is_completed = Column(Boolean, default=False)
 
@@ -152,8 +156,8 @@ class Comment(Base):
     exam_id = Column(Integer, ForeignKey('exam.id'), nullable=False)
     user_id = Column(Integer, ForeignKey('user.id'), nullable=False)
     content = Column(TEXT, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.now())
-    updated_at = Column(DateTime, default=datetime.datetime.now(), onupdate=datetime.datetime.now())
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
     exam = relationship("Exam", back_populates="comments")
     user = relationship("User", back_populates="comments")
@@ -198,6 +202,38 @@ if __name__ == '__main__':
                 username="student3",
                 password=str(hashlib.md5('123'.encode('utf-8')).hexdigest()),
                 email="student3@example.com",
+                role=Role.STUDENT,
+                gender="Male"
+            ),
+            User(
+                name="Dương Thị D",
+                username="student4",
+                password=str(hashlib.md5('123'.encode('utf-8')).hexdigest()),
+                email="student4@gmail.com",
+                role=Role.STUDENT,
+                gender="Female"
+            ),
+            User(
+                name="Võ Thị E",
+                username="student5",
+                password=str(hashlib.md5('123'.encode('utf-8')).hexdigest()),
+                email="student5@gmail.com",
+                role=Role.STUDENT,
+                gender="Female"
+            ),
+            User(
+                name="Đinh Văn F",
+                username="student6",
+                password=str(hashlib.md5('123'.encode('utf-8')).hexdigest()),
+                email="student6@gmail.com",
+                role=Role.STUDENT,
+                gender="Male"
+            ),
+            User(
+                name="Lò Văn G",
+                username="student7",
+                password=str(hashlib.md5('123'.encode('utf-8')).hexdigest()),
+                email="student7@gmail.com",
                 role=Role.STUDENT,
                 gender="Male"
             )
@@ -255,6 +291,41 @@ if __name__ == '__main__':
                 subject_name="Sinh học",
                 description="Môn học về các quá trình sinh học",
                 admin_id=admin_record.id
+            ),
+            Subject(
+                subject_name="Ngữ Văn",
+                description="Môn học về tiếng Việt",
+                admin_id=admin_record.id
+            ),
+            Subject(
+                subject_name="Giáo dục công dân",
+                description="Môn học về bản chất con người",
+                admin_id=admin_record.id
+            ),
+            Subject(
+                subject_name="Công nghệ",
+                description="Môn học về máy móc",
+                admin_id=admin_record.id
+            ),
+            Subject(
+                subject_name="Tin học",
+                description="Môn học về máy tính",
+                admin_id=admin_record.id
+            ),
+            Subject(
+                subject_name="Âm nhạc",
+                description="Môn học về âm thanh và giai điệu",
+                admin_id=admin_record.id
+            ),
+            Subject(
+                subject_name="Mĩ thuật",
+                description="Môn học về cách vẽ và nhìn nhận thế giới",
+                admin_id=admin_record.id
+            ),
+            Subject(
+                subject_name="Tiếng Pháp",
+                description="Môn học về France",
+                admin_id=admin_record.id
             )
         ]
         for subject in subjects:
@@ -297,6 +368,41 @@ if __name__ == '__main__':
             Chapter(chapter_name="Tế bào học", subject_id=subjects[6].id),
             Chapter(chapter_name="Di truyền học", subject_id=subjects[6].id),
             Chapter(chapter_name="Sinh thái học", subject_id=subjects[6].id),
+
+            # Ngữ Văn
+            Chapter(chapter_name="Văn học Việt Nam", subject_id=subjects[7].id),
+            Chapter(chapter_name="Văn học nước ngoài", subject_id=subjects[7].id),
+            Chapter(chapter_name="Tiếng Việt", subject_id=subjects[7].id),
+
+            # Giáo dục công dân
+            Chapter(chapter_name="Công dân và pháp luật", subject_id=subjects[8].id),
+            Chapter(chapter_name="Công dân và kinh tế", subject_id=subjects[8].id),
+            Chapter(chapter_name="Giá trị đạo đức", subject_id=subjects[8].id),
+
+            # Công nghệ
+            Chapter(chapter_name="Cơ khí", subject_id=subjects[9].id),
+            Chapter(chapter_name="Điện tử", subject_id=subjects[9].id),
+            Chapter(chapter_name="Nông nghiệp", subject_id=subjects[9].id),
+
+            # Tin học
+            Chapter(chapter_name="Lập trình", subject_id=subjects[10].id),
+            Chapter(chapter_name="Mạng máy tính", subject_id=subjects[10].id),
+            Chapter(chapter_name="Cơ sở dữ liệu", subject_id=subjects[10].id),
+
+            # Âm nhạc
+            Chapter(chapter_name="Lý thuyết âm nhạc", subject_id=subjects[11].id),
+            Chapter(chapter_name="Nhạc cụ", subject_id=subjects[11].id),
+            Chapter(chapter_name="Thanh nhạc", subject_id=subjects[11].id),
+
+            # Mĩ thuật
+            Chapter(chapter_name="Hội họa", subject_id=subjects[12].id),
+            Chapter(chapter_name="Điêu khắc", subject_id=subjects[12].id),
+            Chapter(chapter_name="Mỹ thuật ứng dụng", subject_id=subjects[12].id),
+
+            # Tiếng Pháp
+            Chapter(chapter_name="Ngữ pháp tiếng Pháp", subject_id=subjects[13].id),
+            Chapter(chapter_name="Từ vựng tiếng Pháp", subject_id=subjects[13].id),
+            Chapter(chapter_name="Văn hóa Pháp", subject_id=subjects[13].id)
         ]
 
         for chapter in chapters:
@@ -443,7 +549,7 @@ if __name__ == '__main__':
             Question(question_title="Chuỗi thức ăn bắt đầu từ:", createBy="admin", chapter_id=chapters[19].id,
                      user_id=admin_record.id),
             Question(question_title="Hiệu ứng nhà kính do đâu gây ra?", createBy="admin",
-                     chapter_id=chapters[19].id, user_id=admin_record.id),
+                     chapter_id=chapters[19].id, user_id=admin_record.id)
         ]
 
         for question in questions:
@@ -758,7 +864,7 @@ if __name__ == '__main__':
             Answer(question_id=questions[46].id, answer_text="Sự gia tăng khí CO₂ và các khí gây giữ nhiệt",
                    is_correct=True, createBy='admin', user_id=admin_record.id),
             Answer(question_id=questions[46].id, answer_text="Sự giảm nhiệt độ toàn cầu", is_correct=False, createBy='admin',
-                   user_id=admin_record.id),
+                   user_id=admin_record.id)
         ]
 
         for answer in answers:
@@ -795,107 +901,96 @@ if __name__ == '__main__':
                 createBy="admin",
                 user_id=admin_record.id
             ),
-
-            # Đề thi 1: Toán học tổng hợp
             Exam(
                 exam_name="Kiểm tra Toán học tổng hợp",
                 subject_id=subjects[0].id,
-                duration=120,
+                duration=10,
                 start_time=datetime.datetime.now() + datetime.timedelta(days=2),
                 end_time=datetime.datetime.now() + datetime.timedelta(days=2, hours=2),
                 createBy="admin",
                 user_id=admin_record.id
             ),
-            # Đề thi 2: Vật lý cơ bản
             Exam(
                 exam_name="Kiểm tra Vật lý cơ bản",
                 subject_id=subjects[1].id,
-                duration=90,
+                duration=10,
                 start_time=datetime.datetime.now() + datetime.timedelta(days=4),
                 end_time=datetime.datetime.now() + datetime.timedelta(days=4, hours=1.5),
                 createBy="admin",
                 user_id=admin_record.id
             ),
-            # Đề thi 3: Hóa học tổng hợp
             Exam(
                 exam_name="Kiểm tra Hóa học tổng hợp",
                 subject_id=subjects[2].id,
-                duration=75,
+                duration=10,
                 start_time=datetime.datetime.now() + datetime.timedelta(days=5),
                 end_time=datetime.datetime.now() + datetime.timedelta(days=5, minutes=75),
                 createBy="admin",
                 user_id=admin_record.id
             ),
-            # Đề thi 4: Tiếng Anh cơ bản
             Exam(
                 exam_name="English Basic Test",
                 subject_id=subjects[3].id,
-                duration=60,
+                duration=10,
                 start_time=datetime.datetime.now() + datetime.timedelta(days=6),
                 end_time=datetime.datetime.now() + datetime.timedelta(days=6, hours=1),
                 createBy="admin",
                 user_id=admin_record.id
             ),
-            # Đề thi 5: Lịch sử Việt Nam
             Exam(
                 exam_name="Kiểm tra Lịch sử Việt Nam",
                 subject_id=subjects[4].id,
-                duration=45,
+                duration=10,
                 start_time=datetime.datetime.now() + datetime.timedelta(days=8),
                 end_time=datetime.datetime.now() + datetime.timedelta(days=8, minutes=45),
                 createBy="admin",
                 user_id=admin_record.id
             ),
-            # Đề thi 6: Địa lý Việt Nam
             Exam(
                 exam_name="Kiểm tra Địa lý Việt Nam",
                 subject_id=subjects[5].id,
-                duration=60,
+                duration=10,
                 start_time=datetime.datetime.now() + datetime.timedelta(days=9),
                 end_time=datetime.datetime.now() + datetime.timedelta(days=9, hours=1),
                 createBy="admin",
                 user_id=admin_record.id
             ),
-            # Đề thi 7: Sinh học cơ bản
             Exam(
                 exam_name="Kiểm tra Sinh học cơ bản",
                 subject_id=subjects[6].id,
-                duration=90,
+                duration=10,
                 start_time=datetime.datetime.now() + datetime.timedelta(days=10),
                 end_time=datetime.datetime.now() + datetime.timedelta(days=10, hours=1.5),
                 createBy="admin",
                 user_id=admin_record.id
             ),
-            # Đề thi 8: Toán học nâng cao
             Exam(
                 exam_name="Kiểm tra Toán học nâng cao",
                 subject_id=subjects[0].id,
-                duration=150,
+                duration=10,
                 start_time=datetime.datetime.now() + datetime.timedelta(days=12),
                 end_time=datetime.datetime.now() + datetime.timedelta(days=12, hours=2.5),
                 createBy="admin",
                 user_id=admin_record.id
             ),
-            # Đề thi 9: Vật lý nâng cao
             Exam(
                 exam_name="Kiểm tra Vật lý nâng cao",
                 subject_id=subjects[1].id,
-                duration=180,
+                duration=10,
                 start_time=datetime.datetime.now() + datetime.timedelta(days=14),
                 end_time=datetime.datetime.now() + datetime.timedelta(days=14, hours=3),
                 createBy="admin",
                 user_id=admin_record.id
             ),
-            # Đề thi 10: Tổng hợp các môn
             Exam(
                 exam_name="Kiểm tra tổng hợp đa môn",
                 subject_id=subjects[0].id,
-                duration=120,
+                duration=10,
                 start_time=datetime.datetime.now() + datetime.timedelta(days=15),
                 end_time=datetime.datetime.now() + datetime.timedelta(days=15, hours=2),
                 createBy="admin",
                 user_id=admin_record.id
-            ),
+            )
         ]
 
         for exam in exams:
@@ -1025,16 +1120,16 @@ if __name__ == '__main__':
             ExamQuestions(exam_id=exams[11].id, question_id=questions[12].id, number_of_questions=10),
 
             # Đề thi 10: Tổng hợp đa môn (10 câu từ các môn khác nhau)
-            ExamQuestions(exam_id=exams[12].id, question_id=questions[0].id, number_of_questions=1),  # Toán
-            ExamQuestions(exam_id=exams[12].id, question_id=questions[2].id, number_of_questions=2),  # Vật lý
-            ExamQuestions(exam_id=exams[12].id, question_id=questions[4].id, number_of_questions=3),  # Hóa học
-            ExamQuestions(exam_id=exams[12].id, question_id=questions[23].id, number_of_questions=4),  # Tiếng Anh
-            ExamQuestions(exam_id=exams[12].id, question_id=questions[29].id, number_of_questions=5),  # Lịch sử
-            ExamQuestions(exam_id=exams[12].id, question_id=questions[34].id, number_of_questions=6),  # Địa lý
-            ExamQuestions(exam_id=exams[12].id, question_id=questions[40].id, number_of_questions=7),  # Sinh học
-            ExamQuestions(exam_id=exams[12].id, question_id=questions[5].id, number_of_questions=8),  # Toán
-            ExamQuestions(exam_id=exams[12].id, question_id=questions[13].id, number_of_questions=9),  # Vật lý
-            ExamQuestions(exam_id=exams[12].id, question_id=questions[19].id, number_of_questions=10),  # Hóa học
+            ExamQuestions(exam_id=exams[12].id, question_id=questions[0].id, number_of_questions=1),
+            ExamQuestions(exam_id=exams[12].id, question_id=questions[2].id, number_of_questions=2),
+            ExamQuestions(exam_id=exams[12].id, question_id=questions[4].id, number_of_questions=3),
+            ExamQuestions(exam_id=exams[12].id, question_id=questions[23].id, number_of_questions=4),
+            ExamQuestions(exam_id=exams[12].id, question_id=questions[29].id, number_of_questions=5),
+            ExamQuestions(exam_id=exams[12].id, question_id=questions[34].id, number_of_questions=6),
+            ExamQuestions(exam_id=exams[12].id, question_id=questions[40].id, number_of_questions=7),
+            ExamQuestions(exam_id=exams[12].id, question_id=questions[5].id, number_of_questions=8),
+            ExamQuestions(exam_id=exams[12].id, question_id=questions[13].id, number_of_questions=9),
+            ExamQuestions(exam_id=exams[12].id, question_id=questions[19].id, number_of_questions=10)
         ]
 
         for eq in exam_questions:
@@ -1101,6 +1196,66 @@ if __name__ == '__main__':
             Comment(
                 exam_id=exams[7].id,
                 user_id=student_users[2].id,
+                content="Rất bổ ích, mong có thêm đề tương tự!",
+                created_at=datetime.datetime.now()
+            ),
+            Comment(
+                exam_id=exams[0].id,
+                user_id=student_users[1].id,
+                content="Rất bổ ích, mong có thêm đề tương tự!",
+                created_at=datetime.datetime.now()
+            ),
+            Comment(
+                exam_id=exams[0].id,
+                user_id=student_users[1].id,
+                content="Rất bổ ích, mong có thêm đề tương tự!",
+                created_at=datetime.datetime.now()
+            ),
+            Comment(
+                exam_id=exams[0].id,
+                user_id=student_users[0].id,
+                content="Rất bổ ích, mong có thêm đề tương tự!",
+                created_at=datetime.datetime.now()
+            ),
+            Comment(
+                exam_id=exams[0].id,
+                user_id=student_users[2].id,
+                content="Rất bổ ích, mong có thêm đề tương tự!",
+                created_at=datetime.datetime.now()
+            ),
+            Comment(
+                exam_id=exams[0].id,
+                user_id=student_users[0].id,
+                content="Rất bổ ích, mong có thêm đề tương tự!",
+                created_at=datetime.datetime.now()
+            ),
+            Comment(
+                exam_id=exams[0].id,
+                user_id=student_users[2].id,
+                content="Rất bổ ích, mong có thêm đề tương tự!",
+                created_at=datetime.datetime.now()
+            ),
+            Comment(
+                exam_id=exams[0].id,
+                user_id=student_users[2].id,
+                content="Rất bổ ích, mong có thêm đề tương tự!",
+                created_at=datetime.datetime.now()
+            ),
+            Comment(
+                exam_id=exams[1].id,
+                user_id=student_users[2].id,
+                content="Rất bổ ích, mong có thêm đề tương tự!",
+                created_at=datetime.datetime.now()
+            ),
+            Comment(
+                exam_id=exams[1].id,
+                user_id=student_users[1].id,
+                content="Rất bổ ích, mong có thêm đề tương tự!",
+                created_at=datetime.datetime.now()
+            ),
+            Comment(
+                exam_id=exams[1].id,
+                user_id=student_users[3].id,
                 content="Rất bổ ích, mong có thêm đề tương tự!",
                 created_at=datetime.datetime.now()
             ),

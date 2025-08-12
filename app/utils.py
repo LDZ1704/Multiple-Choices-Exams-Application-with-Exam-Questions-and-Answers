@@ -163,14 +163,19 @@ def calculate_exam_score(exam_id, user_answers):
         return 0
 
 
-def save_exam_result(student_id, exam_id, score, answers, time_taken):
+def save_exam_result(student_id, exam_id, score, answers, time_taken_seconds):
     try:
+        existing_result = ExamResult.query.filter_by(student_id=student_id, exam_id=exam_id).first()
+        is_first_attempt = existing_result is None
+
         exam_result = ExamResult(
             student_id=student_id,
             exam_id=exam_id,
             score=score,
             taken_exam=datetime.now(),
-            user_answers=answers  #Lưu câu trả lời của user dưới dạng JSON
+            time_taken=time_taken_seconds,
+            user_answers=answers, #Lưu câu trả lời của user dưới dạng JSON
+            is_first_attempt=is_first_attempt
         )
 
         db.session.add(exam_result)
@@ -419,13 +424,35 @@ def create_random_exam(creator_id, exam_name, subject_id, duration, question_cou
 
 def create_exam_session(student_id, exam_id):
     try:
-        session_obj = ExamSession(student_id=student_id, exam_id=exam_id, start_time=datetime.now())
+        questions = dao.get_exam_questions_with_answers(exam_id)
+
+        question_ids = [q['id'] for q in questions]
+        random.shuffle(question_ids)
+
+        answer_orders = {}
+        for question in questions:
+            answer_ids = [answer['id'] for answer in question['answers']]
+            random.shuffle(answer_ids)
+            answer_orders[str(question['id'])] = answer_ids
+
+        session_obj = ExamSession(
+            student_id=student_id,
+            exam_id=exam_id,
+            current_question_index=0,
+            user_answers={},
+            question_order=question_ids,
+            answer_orders=answer_orders,
+            is_paused=False,
+            is_completed=False
+        )
+
         db.session.add(session_obj)
         db.session.commit()
         return session_obj
+
     except Exception as e:
+        print(f"Error creating exam session: {e}")
         db.session.rollback()
-        print(f"Lỗi tạo exam session: {e}")
         return None
 
 
@@ -531,3 +558,34 @@ def get_highest_score(user_id, exam_id):
     highest_result = db.session.query(ExamResult).filter(ExamResult.student_id == student.id, ExamResult.exam_id == exam_id).order_by(ExamResult.score.desc()).first()
 
     return highest_result.score if highest_result else 0
+
+
+def get_ordered_questions_for_session(exam_id, question_order, answer_orders):
+    try:
+        original_questions = dao.get_exam_questions_with_answers(exam_id)
+
+        questions_dict = {q['id']: q for q in original_questions}
+
+        ordered_questions = []
+        for question_id in question_order:
+            if question_id in questions_dict:
+                question = questions_dict[question_id].copy()
+
+                if str(question_id) in answer_orders:
+                    answer_order = answer_orders[str(question_id)]
+                    answers_dict = {a['id']: a for a in question['answers']}
+                    ordered_answers = []
+
+                    for answer_id in answer_order:
+                        if answer_id in answers_dict:
+                            ordered_answers.append(answers_dict[answer_id])
+
+                    question['answers'] = ordered_answers
+
+                ordered_questions.append(question)
+
+        return ordered_questions
+
+    except Exception as e:
+        print(f"Error getting ordered questions: {e}")
+        return []

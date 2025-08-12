@@ -1,17 +1,4 @@
 document.addEventListener('DOMContentLoaded', function() {
-    //Tự động ẩn sau 5s thông báo
-    setTimeout(function () {
-        const flashAlerts = document.querySelectorAll('.flash-alert');
-        flashAlerts.forEach(alert => {
-            alert.classList.remove('show');
-            setTimeout(() => {
-                alert.remove();
-            }, 300);
-        });
-    }, 5000);
-});
-
-document.addEventListener('DOMContentLoaded', function() {
     //Chức năng scroll-to-top
     const scrollToTopBtn = document.getElementById('scrollToTop');
 

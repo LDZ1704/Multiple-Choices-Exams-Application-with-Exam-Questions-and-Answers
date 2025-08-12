@@ -4,6 +4,8 @@
 
 {% block body %}
 <h2 class="page-title">Trang tổng quan</h2>
+
+<!-- Main Stats Cards -->
 <div class="row g-4 mb-4">
     <div class="col-md-3">
         <div class="card stat-card">
@@ -104,8 +106,8 @@
 </div>
 
 <!-- Performance Alert -->
-{% if stats.total_attempts > 0 %}
-    {% set avg_attempts_per_exam = (stats.total_attempts / stats.total_exams) if stats.total_exams > 0 else 0 %}
+{% if stats.total_attempts > 0 and stats.total_exams > 0 %}
+    {% set avg_attempts_per_exam = (stats.total_attempts / stats.total_exams) %}
     {% if avg_attempts_per_exam < 5 %}
     <div class="alert alert-warning alert-dismissible fade show" role="alert">
         <i class="bi bi-exclamation-triangle me-2"></i>
@@ -136,7 +138,7 @@
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-hover">
-                        <thead>
+                        <thead class="table-light">
                         <tr>
                             <th>Tên đề thi</th>
                             <th>Môn học</th>
@@ -158,16 +160,16 @@
                                 </small>
                             </td>
                             <td>
-                                <span class="badge bg-primary">{{ exam.subject.subject_name }}</span>
+                                <span class="badge bg-primary">{{ exam.subject.subject_name if exam.subject else 'N/A' }}</span>
                             </td>
                             <td>
-                                <i class="bi bi-person-circle me-1"></i>{{ exam.createBy }}
+                                <i class="bi bi-person-circle me-1"></i>{{ exam.createBy or 'N/A' }}
                             </td>
-                            <td>{{ exam.createAt.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ exam.createAt.strftime('%d/%m/%Y %H:%M') if exam.createAt else 'N/A' }}</td>
                             <td>
                                 {% set attempt_count = exam.exam_results|length if exam.exam_results else 0 %}
                                 {% if attempt_count > 0 %}
-                                    <span class="badge bg-success">Hoạt động ({{ attempt_count }})</span>
+                                    <span class="badge bg-success">Hoạt động ({{ attempt_count }} lần thi)</span>
                                 {% else %}
                                     <span class="badge bg-secondary">Chưa có lượt thi</span>
                                 {% endif %}
@@ -216,40 +218,8 @@
     </div>
 
     <div class="col-lg-4">
-        <!-- Recent Activities -->
-        <div class="card mb-4">
-            <div class="card-header bg-white">
-                <h5 class="mb-0">
-                    <i class="bi bi-activity me-2"></i>
-                    Hoạt động gần đây
-                </h5>
-            </div>
-            <div class="card-body">
-                {% if recent_activities %}
-                {% for activity in recent_activities %}
-                <div class="d-flex align-items-center mb-3">
-                    <div class="bg-{{ activity.type }} rounded-circle p-2 me-3"
-                         style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
-                        <i class="bi bi-{{ activity.icon }} text-white"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                        <small class="text-muted">{{ activity.time_ago }}</small>
-                        <p class="mb-0 fw-medium">{{ activity.description }}</p>
-                    </div>
-                </div>
-                {% endfor %}
-                {% else %}
-                <div class="text-center text-muted py-4">
-                    <i class="bi bi-clock-history display-6 d-block mb-3"></i>
-                    <p>Chưa có hoạt động nào</p>
-                    <small>Hoạt động sẽ được hiển thị tại đây</small>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-
         <!-- Quick Actions -->
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-header bg-white">
                 <h5 class="mb-0">
                     <i class="bi bi-lightning me-2"></i>
@@ -291,6 +261,23 @@
                 </div>
             </div>
         </div>
+
+        <!-- Recent Activities placeholder -->
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-activity me-2"></i>
+                    Hoạt động gần đây
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-clock-history display-6 d-block mb-3"></i>
+                    <p>Chưa có hoạt động nào</p>
+                    <small>Hoạt động sẽ được hiển thị tại đây</small>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -317,7 +304,7 @@
                         </span></p>
                     </div>
                     <div class="col-md-4">
-                        <p><strong>Cập nhật cuối:</strong> {{ moment().format('DD/MM/YYYY') if moment else datetime.now().strftime('%d/%m/%Y') }}</p>
+                        <p><strong>Cập nhật cuối:</strong> {{ datetime.now().strftime('%d/%m/%Y') }}</p>
                         <p><strong>Admin:</strong>
                             <span class="badge bg-info">
                                 <i class="bi bi-person-badge me-1"></i>
@@ -353,11 +340,15 @@
 
 <script>
     function confirmDelete(examId, examName) {
-        document.getElementById('examNameToDelete').textContent = examName;
-        document.getElementById('confirmDeleteBtn').onclick = function() {
-            window.location.href = `/admin/exam/delete/?id=${examId}`;
-        };
-        new bootstrap.Modal(document.getElementById('deleteModal')).show();
-    }
+    document.getElementById('examNameToDelete').textContent = examName;
+    document.getElementById('confirmDeleteBtn').onclick = function() {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/admin/exam/delete/?id=' + examId + '&url=' + encodeURIComponent(window.location.href);
+        document.body.appendChild(form);
+        form.submit();
+    };
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
 </script>
 {% endblock %}

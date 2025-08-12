@@ -99,24 +99,69 @@
     </div>
 </div>
 
-<!-- Monthly Performance Chart -->
-{% if monthly_scores %}
+<!-- Performance Analysis -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
             <div class="card-header bg-white">
                 <h5 class="mb-0">
                     <i class="bi bi-graph-up me-2"></i>
-                    Xu hướng điểm số theo tháng
+                    Phân tích hiệu suất hệ thống
                 </h5>
             </div>
             <div class="card-body">
-                <canvas id="monthlyChart" width="400" height="150"></canvas>
+                {% if exam_stats %}
+                    {% set total_attempts = exam_stats|sum(attribute='attempts') or 0 %}
+                    {% set exams_with_attempts = exam_stats|selectattr('attempts')|list %}
+                    {% set avg_score_all = (exams_with_attempts|sum(attribute='avg_score') / exams_with_attempts|length) if exams_with_attempts|length > 0 else 0 %}
+
+                    <div class="row text-center mb-3">
+                        <div class="col-md-4">
+                            <h4 class="text-primary">{{ total_attempts }}</h4>
+                            <small class="text-muted">Tổng lượt thi</small>
+                        </div>
+                        <div class="col-md-4">
+                            <h4 class="text-success">{{ "%.1f"|format(avg_score_all) }}</h4>
+                            <small class="text-muted">Điểm TB toàn hệ thống</small>
+                        </div>
+                        <div class="col-md-4">
+                            <h4 class="text-info">{{ exams_with_attempts|length }}</h4>
+                            <small class="text-muted">Đề thi có lượt thi</small>
+                        </div>
+                    </div>
+
+                    <div class="progress mb-3" style="height: 20px;">
+                        <div class="progress-bar bg-success" style="width: {{ ((avg_score_all/100)*100)|round|int if avg_score_all else 0 }}%">
+                            {{ "%.1f"|format(avg_score_all) }}/100
+                        </div>
+                    </div>
+
+                    <!-- Performance Insights -->
+                    <div class="alert alert-info">
+                        <small>
+                            <i class="bi bi-lightbulb me-1"></i>
+                            <strong>Thông tin:</strong>
+                            {% if avg_score_all >= 80 %}
+                                Hệ thống đang hoạt động xuất sắc với điểm số rất cao!
+                            {% elif avg_score_all >= 65 %}
+                                Chất lượng giáo dục tốt, học sinh đạt kết quả khá cao.
+                            {% elif avg_score_all >= 50 %}
+                                Cần cải thiện chất lượng đề thi và phương pháp dạy học.
+                            {% else %}
+                                Cần xem xét lại toàn bộ hệ thống đề thi và nội dung.
+                            {% endif %}
+                        </small>
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted">
+                        <i class="bi bi-graph-up display-6 d-block mb-3"></i>
+                        <p>Chưa có dữ liệu phân tích</p>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
-{% endif %}
 
 <!-- Main Content Row -->
 <div class="row">
@@ -131,9 +176,10 @@
                 <span class="badge bg-primary">{{ exam_stats|length if exam_stats else 0 }} đề thi</span>
             </div>
             <div class="card-body">
+                {% if exam_stats %}
                 <div class="table-responsive">
                     <table class="table table-hover">
-                        <thead>
+                        <thead class="table-light">
                             <tr>
                                 <th>Tên đề thi</th>
                                 <th>Môn học</th>
@@ -151,12 +197,12 @@
                                 <td><span class="badge bg-primary">{{ stat.attempts or 0 }}</span></td>
                                 <td>
                                     {% if stat.avg_score %}
-                                        {% set score = stat.avg_score %}
-                                        {% if score >= 8 %}
+                                        {% set score = stat.avg_score if stat.avg_score is not none else 0 %}
+                                        {% if score >= 80 %}
                                             <span class="badge bg-success">{{ "%.1f"|format(score) }}</span>
-                                        {% elif score >= 6.5 %}
+                                        {% elif score >= 65 %}
                                             <span class="badge bg-primary">{{ "%.1f"|format(score) }}</span>
-                                        {% elif score >= 5 %}
+                                        {% elif score >= 50 %}
                                             <span class="badge bg-warning">{{ "%.1f"|format(score) }}</span>
                                         {% else %}
                                             <span class="badge bg-danger">{{ "%.1f"|format(score) }}</span>
@@ -165,13 +211,20 @@
                                         <span class="badge bg-secondary">N/A</span>
                                     {% endif %}
                                 </td>
-                                <td><span class="badge bg-success">{{ stat.max_score or "N/A" }}</span></td>
-                                <td><span class="badge bg-danger">{{ stat.min_score or "N/A" }}</span></td>
+                                <td><span class="badge bg-success">{{ stat.max_score if stat.max_score is not none else "N/A" }}</span></td>
+                                <td><span class="badge bg-danger">{{ stat.min_score if stat.min_score is not none else "N/A" }}</span></td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-inbox display-4 d-block mb-3"></i>
+                    <h5>Chưa có dữ liệu thống kê</h5>
+                    <p>Dữ liệu sẽ hiển thị khi có đề thi và lượt thi</p>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -208,15 +261,15 @@
                         </div>
                         <div>
                             {% if student.avg_score %}
-                                {% set score = student.avg_score %}
-                                {% if score >= 8 %}
+                                {% set score = student.avg_score if student.avg_score is not none else 0 %}
+                                {% if score >= 80 %}
                                     <span class="badge bg-success">{{ "%.1f"|format(score) }}</span>
-                                {% elif score >= 6.5 %}
+                                {% elif score >= 65 %}
                                     <span class="badge bg-primary">{{ "%.1f"|format(score) }}</span>
-                                {% elif score >= 5 %}
+                                {% elif score >= 50 %}
                                     <span class="badge bg-warning">{{ "%.1f"|format(score) }}</span>
                                 {% else %}
-                                    <span class="badge bg-danger">{{ "%.1f"|format(score) }}</span>
+                                    <span class="badge bg-info">{{ "%.1f"|format(score) }}</span>
                                 {% endif %}
                             {% endif %}
                         </div>
@@ -228,62 +281,6 @@
                     <p>Chưa có dữ liệu thành tích</p>
                     <small>Kết quả sẽ hiển thị khi có học sinh tham gia</small>
                 </div>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Performance Analysis -->
-        <div class="card mb-4">
-            <div class="card-header bg-white">
-                <h5 class="mb-0">
-                    <i class="bi bi-graph-up me-2"></i>
-                    Phân tích hiệu suất
-                </h5>
-            </div>
-            <div class="card-body">
-                {% if exam_stats %}
-                    {% set total_attempts = exam_stats|sum(attribute='attempts') or 0 %}
-                    {% set exams_with_attempts = exam_stats|selectattr('attempts')|list %}
-                    {% set avg_score_all = (exams_with_attempts|sum(attribute='avg_score') / exams_with_attempts|length) if exams_with_attempts|length > 0 else 0 %}
-
-                    <div class="row text-center mb-3">
-                        <div class="col-6">
-                            <h4 class="text-primary">{{ total_attempts }}</h4>
-                            <small class="text-muted">Tổng lượt thi</small>
-                        </div>
-                        <div class="col-6">
-                            <h4 class="text-success">{{ "%.1f"|format(avg_score_all) }}</h4>
-                            <small class="text-muted">Điểm TB toàn hệ thống</small>
-                        </div>
-                    </div>
-
-                    <div class="progress mb-3" style="height: 20px;">
-                        <div class="progress-bar bg-success" style="width: {{ ((avg_score_all/10)*100)|round|int if avg_score_all else 0 }}%">
-                            {{ "%.1f"|format(avg_score_all) }}/100
-                        </div>
-                    </div>
-
-                    <!-- Performance Insights -->
-                    <div class="alert alert-info">
-                        <small>
-                            <i class="bi bi-lightbulb me-1"></i>
-                            <strong>Thông tin:</strong>
-                            {% if avg_score_all >= 8 %}
-                                Hệ thống đang hoạt động xuất sắc với điểm số rất cao!
-                            {% elif avg_score_all >= 6.5 %}
-                                Chất lượng giáo dục tốt, học sinh đạt kết quả khá cao.
-                            {% elif avg_score_all >= 5 %}
-                                Cần cải thiện chất lượng đề thi và phương pháp dạy học.
-                            {% else %}
-                                Cần xem xét lại toàn bộ hệ thống đề thi và nội dung.
-                            {% endif %}
-                        </small>
-                    </div>
-                {% else %}
-                    <div class="text-center text-muted">
-                        <i class="bi bi-graph-up display-6 d-block mb-3"></i>
-                        <p>Chưa có dữ liệu phân tích</p>
-                    </div>
                 {% endif %}
             </div>
         </div>
@@ -400,7 +397,7 @@
                                     {% endfor %}
                                 {% endif %}
                             ];
-                            return examNames[index];
+                            return examNames[index] || 'N/A';
                         }
                     }
                 }
@@ -423,16 +420,15 @@
     let excellent = 0, good = 0, fair = 0, poor = 0;
     {% if user_stats %}
         {% for user in user_stats %}
-            {% if user.avg_score %}
-                {% if user.avg_score >= 80 %}
-                    excellent++;
-                {% elif user.avg_score >= 65 %}
-                    good++;
-                {% elif user.avg_score >= 40 %}
-                    fair++;
-                {% else %}
-                    poor++;
-                {% endif %}
+            {% set score = user.avg_score or 0 %}
+            {% if score >= 80 %}
+                excellent++;
+            {% elif score >= 65 %}
+                good++;
+            {% elif score >= 40 %}
+                fair++;
+            {% else %}
+                poor++;
             {% endif %}
         {% endfor %}
     {% endif %}
@@ -471,96 +467,6 @@
             }
         }
     });
-
-    {% if monthly_scores %}
-    // Monthly Performance Chart - đã sửa
-    const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
-    new Chart(monthlyCtx, {
-        type: 'line',
-        data: {
-            labels: [
-                {% for score in monthly_scores %}
-                    '{{ score.month }}'{% if not loop.last %},{% endif %}
-                {% endfor %}
-            ],
-            datasets: [{
-                label: 'Điểm trung bình',
-                data: [
-                    {% for score in monthly_scores %}
-                        {{ score.avg_score|round(1) if score.avg_score else 0 }}{% if not loop.last %},{% endif %}
-                    {% endfor %}
-                ],
-                borderColor: 'rgba(75, 192, 192, 1)',
-                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                borderWidth: 3,
-                fill: true,
-                tension: 0.4,
-                yAxisID: 'y'
-            }, {
-                label: 'Số lượt thi',
-                data: [
-                    {% for score in monthly_scores %}
-                        {{ score.attempts or 0 }}{% if not loop.last %},{% endif %}
-                    {% endfor %}
-                ],
-                borderColor: 'rgba(255, 99, 132, 1)',
-                backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                borderWidth: 2,
-                yAxisID: 'y1',
-                type: 'bar'
-            }]
-        },
-        options: {
-            responsive: true,
-            interaction: {
-                mode: 'index',
-                intersect: false,
-            },
-            scales: {
-                x: {
-                    display: true,
-                    title: {
-                        display: true,
-                        text: 'Tháng'
-                    }
-                },
-                y: {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
-                    beginAtZero: true,
-                    max: 10,
-                    title: {
-                        display: true,
-                        text: 'Điểm trung bình'
-                    }
-                },
-                y1: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Số lượt thi'
-                    },
-                    grid: {
-                        drawOnChartArea: false,
-                    },
-                }
-            },
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Xu hướng điểm số và lượt thi theo tháng'
-                },
-                legend: {
-                    position: 'top'
-                }
-            }
-        }
-    });
-    {% endif %}
 
     // Utility functions
     function refreshStats() {

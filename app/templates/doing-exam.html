@@ -754,8 +754,42 @@
 
     function autoSubmitExam() {
         if (!examSubmitted) {
-            alert('Hết thời gian! Bài thi sẽ được nộp tự động.');
-            submitExam();
+            examSubmitted = true;
+            clearInterval(examTimer);
+
+            const submissionData = {
+                exam_id: examId,
+                answers: userAnswers,
+                time_taken: {{ exam.duration }} * 60
+            };
+
+            document.querySelector('.container-fluid').innerHTML = `
+                <div class="text-center py-5">
+                    <div class="spinner-border text-warning mb-3" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Hết thời gian! Đang tự động nộp bài...</span>
+                    </div>
+                    <h4 class="text-warning">Hết thời gian! Đang tự động nộp bài...</h4>
+                    <p class="text-muted">Vui lòng đợi trong giây lát</p>
+                </div>
+            `;
+
+            fetch('/api/exam/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(submissionData)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = data.redirect_url + '&timeout=true';
+                } else {
+                    window.location.href = '/?message=timeout&type=warning';
+                }
+            })
+            .catch(err => {
+                console.error('Auto-submit failed:', err);
+                window.location.href = '/?message=timeout&type=warning';
+            });
         }
     }
 
@@ -796,10 +830,10 @@
     }
 
     function confirmRestartExam() {
+        updateRestartModalStats();
+
         const modal = new bootstrap.Modal(document.getElementById('restartExamModal'));
         modal.show();
-
-        updateRestartModalStats();
     }
 
     function updateRestartModalStats() {
@@ -822,6 +856,72 @@
         }
 
         document.getElementById('restart-time-used').textContent = timeText;
+    }
+
+    function restartExam() {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('restartExamModal'));
+        modal.hide();
+
+        const examId = getExamId();
+
+        if (!examId) {
+            alert('Không thể xác định bài thi!');
+            return;
+        }
+
+        showLoadingOverlay('Đang reset bài thi...', 'Vui lòng đợi trong giây lát');
+
+        fetch(`/api/exam/${examId}/restart`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = `/doing-exam/${examId}?restart=1`;
+            } else {
+                showErrorOverlay('Lỗi: ' + (data.error || 'Không thể reset bài thi'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showErrorOverlay('Không thể kết nối tới máy chủ');
+        });
+    }
+
+    function getExamId() {
+        if (typeof examId !== 'undefined') return examId;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlExamId = urlParams.get('id') || urlParams.get('exam_id');
+        if (urlExamId) return urlExamId;
+
+        const pathMatch = window.location.pathname.match(/doing-exam\/(\d+)/);
+        if (pathMatch) return pathMatch[1];
+
+        const examElement = document.querySelector('[data-exam-id]');
+        if (examElement) return examElement.dataset.examId;
+
+        return null;
+    }
+
+    function showLoadingOverlay(title, message) {
+        const container = document.querySelector('.container-fluid') || document.body;
+        container.innerHTML = `
+            <div class="text-center py-5" style="min-height: 250px;">
+                <div class="position-relative d-inline-block mb-4">
+                    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem; animation: spin 1s linear infinite;">
+                        <span class="visually-hidden">${title}</span>
+                    </div>
+                    <i class="bi bi-lightning-fill text-warning position-absolute top-50 start-50 translate-middle" style="font-size: 1.2rem;"></i>
+                </div>
+                <h4 class="fw-bold text-primary mb-2">${title}</h4>
+                <p class="text-white mb-0">${message}</p>
+                <div class="progress mt-4" style="height: 5px; max-width: 200px; margin: 0 auto;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 75%"></div>
+                </div>
+            </div>
+        `;
     }
 </script>
 {% endblock %}

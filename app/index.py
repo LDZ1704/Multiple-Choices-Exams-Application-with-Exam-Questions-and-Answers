@@ -12,6 +12,9 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 from app.admin import *
+import qrcode
+from io import BytesIO
+import base64
 
 
 @app.context_processor
@@ -58,7 +61,7 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    err_message = ''
+    username = ''
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
@@ -68,7 +71,7 @@ def login():
 
         if user:
             login_user(user)
-            flash('Chào mừng ' + username + ' tới LmaoQuiz', 'success')
+            flash('Chào mừng ' + user.name + ' tới LmaoQuiz', 'success')
 
             if user.role == Role.ADMIN:
                 if not dao.existence_check(AdminModels, 'user_id', user.id):
@@ -81,9 +84,8 @@ def login():
 
         else:
             flash('Thông tin tài khoản và mật khẩu không chính xác!', 'danger')
-            err_message = 'Thông tin tài khoản và mật khẩu không chính xác!'
 
-    return render_template('login.html', err_message=err_message)
+    return render_template('login.html', username=username)
 
 
 @login_manager.user_loader
@@ -100,30 +102,42 @@ def logout():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    regex_username = '^[a-zA-Z0-9]+$'
-    err_message = {}
+    regex_username = '^(?=.*[a-zA-Z])(?=.*[0-9])[a-zA-Z0-9]+$'
+    username = email = name = gender = ''
     if request.method == 'POST':
-        username = request.form['username']
+        username = request.form['username'].strip()
         email = request.form['email']
         name = request.form['name']
         password = request.form['password']
         confirm_password = request.form['confirm-password']
         gender = request.form.get('gender')
 
-        if dao.existence_check(User, 'username', username):
-            err_message['err_username'] = 'Tên tài khoản này đã tồn tại!'
-        if not re.fullmatch(regex_username, username):
-            err_message['err_format'] = 'Tên tài khoản phải có cả chữ và số!'
-        if not password.__eq__(confirm_password):
-            err_message['err_password'] = 'Bạn phải xác nhận lại mật khẩu giống mật khẩu của bạn.'
-        if '@' not in email:
-            err_message['err_email'] = 'Email phải theo đúng định dạng (abc@example.com)!'
-        elif dao.existence_check(User, 'email', email):
-            err_message['err_email'] = 'Email đã tồn tại trong hệ thống!'
+        has_error = False
 
-        if err_message:
-            return render_template('register.html', err_message=err_message, username=username, name=name,
-                                   gender=gender, email=email)
+        if dao.existence_check(User, 'username', username):
+            flash('Tên tài khoản này đã tồn tại!', 'danger')
+            has_error = True
+        if ' ' in username:
+            flash('Tên tài khoản không được chứa dấu cách!', 'danger')
+            has_error = True
+        elif not re.fullmatch(regex_username, username):
+            flash('Tên tài khoản phải có cả chữ và số!', 'danger')
+            has_error = True
+        if len(username) < 3:
+            flash('Tên tài khoản phải có ít nhất 3 ký tự!', 'danger')
+            has_error = True
+        if not password.__eq__(confirm_password):
+            flash('Bạn phải xác nhận lại mật khẩu giống mật khẩu của bạn.', 'danger')
+            has_error = True
+        if '@' not in email:
+            flash('Email phải theo đúng định dạng (abc@example.com)!', 'danger')
+            has_error = True
+        elif dao.existence_check(User, 'email', email):
+            flash('Email đã tồn tại trong hệ thống!', 'danger')
+            has_error = True
+
+        if has_error:
+            return render_template('register.html', username=username, email=email, name=name, gender=gender)
         else:
             data = request.form.copy()
             del data['confirm-password']
@@ -131,13 +145,14 @@ def register():
             flash('Chào mừng ' + name + ' tới LmaoQuiz', 'success')
             return redirect('/login')
 
-    return render_template('register.html', err_message=err_message)
+    return render_template('register.html', username=username, email=email, name=name, gender=gender)
 
 
 @app.route('/examdetail')
 def exam_detail():
     exam_id = request.args.get('id', type=int)
     comment_page = request.args.get('comment_page', 1, type=int)
+    ranking_page = request.args.get('ranking_page', 1, type=int)
     session_obj = None
 
     if not exam_id:
@@ -159,6 +174,20 @@ def exam_detail():
 
     comments_pagination = utils.get_exam_comments_with_pagination(exam_id, page=comment_page, per_page=app.config['COMMENT_SIZE'])
 
+    ranking_pagination = dao.get_exam_ranking_with_pagination(
+        exam_id=exam_id,
+        page=ranking_page,
+        per_page=20
+    )
+
+    ranking_stats = None
+    if dao.count_exam_participants(exam_id) > 0:
+        ranking_stats = {
+            'total_participants': dao.count_exam_participants(exam_id),
+            'avg_score': dao.get_exam_average_score(exam_id),
+            'highest_score': dao.get_exam_highest_score(exam_id)
+        }
+
     user_results = None
     highest_score = 0
     has_result = False
@@ -169,7 +198,34 @@ def exam_detail():
         if student:
             has_result = dao.has_exam_result(student.id, exam_id)
 
-    return render_template('examdetail.html', exam=exam, stats=stats, question_count=question_count, comments_pagination=comments_pagination, user_results=user_results, session=session_obj, highest_score=highest_score, has_result=has_result)
+    return render_template('examdetail.html', exam=exam, stats=stats, question_count=question_count, comments_pagination=comments_pagination, user_results=user_results, session=session_obj, highest_score=highest_score, has_result=has_result, ranking_pagination=ranking_pagination, ranking_stats=ranking_stats)
+
+
+@app.route('/api/exam/<int:exam_id>/qr-code')
+def generate_exam_qr(exam_id):
+    exam = dao.get_exam_by_id(exam_id)
+    if not exam:
+        return jsonify({'error': 'Đề thi không tồn tại'}), 404
+
+    exam_url = request.url_root + f'examdetail?id={exam_id}'
+
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4,)
+    qr.add_data(exam_url)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    buffer = BytesIO()
+    img.save(buffer, format='PNG')
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.getvalue()).decode()
+
+    return jsonify({
+        'success': True,
+        'qr_image': f'data:image/png;base64,{img_base64}',
+        'exam_url': exam_url,
+        'exam_name': exam.exam_name
+    })
 
 
 @app.route('/add-exam-comment', methods=['POST'])
@@ -212,7 +268,7 @@ def account_detail():
 def update_account():
     try:
         user_id = session.get('_user_id')
-        username = session.get('username')
+        username = request.form.get('username')
         name = request.form.get('name')
         email = request.form.get('email')
         gender = request.form.get('gender')
@@ -254,13 +310,11 @@ def update_avatar():
         flash('Vui lòng chọn ảnh!', 'error')
         return redirect(url_for('account_detail'))
 
-    # Kiểm tra định dạng file
     allowed_extensions = {'png', 'jpg', 'jpeg', 'gif'}
     if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
         flash('Chỉ chấp nhận file ảnh (PNG, JPG, JPEG, GIF)!', 'error')
         return redirect(url_for('account_detail'))
 
-    # Kiểm tra kích thước file (tối đa 5MB)
     file.seek(0, os.SEEK_END)
     file_size = file.tell()
     file.seek(0)
@@ -269,7 +323,6 @@ def update_avatar():
         flash('Kích thước file quá lớn! Vui lòng chọn ảnh dưới 5MB.', 'error')
         return redirect(url_for('account_detail'))
 
-    # Upload lên Cloudinary
     avatar_url = utils.upload_avatar_to_cloudinary(file)
 
     if avatar_url:
@@ -434,10 +487,52 @@ def reset_password():
 @app.route('/subjects')
 def subjects():
     search_query = request.args.get('search', '', type=str)
+    sort_by = request.args.get('sort', 'name', type=str)
+    filter_has_exam = request.args.get('filter_exam', '', type=str)
+
     subjects_with_exams = dao.get_all_subjects_with_exams(
-        search_query=search_query.strip() if search_query else None
+        search_query=search_query.strip() if search_query else None,
+        sort_by=sort_by,
+        filter_has_exam=filter_has_exam
     )
-    return render_template('subjects.html', subjects_with_exams=subjects_with_exams, search_query=search_query)
+
+    subjects_tree = {}
+    all_subjects = dao.get_all_subjects()
+
+    for subject in all_subjects:
+        category = get_subject_category(subject.subject_name)
+        if category not in subjects_tree:
+            subjects_tree[category] = []
+        subjects_tree[category].append(subject)
+
+    return render_template('subjects.html', subjects_with_exams=subjects_with_exams, subjects_tree=subjects_tree, search_query=search_query, sort_by=sort_by, filter_has_exam=filter_has_exam)
+
+
+def get_subject_category(subject_name):
+    subject_lower = subject_name.lower()
+
+    if any(keyword in subject_lower for keyword in ['toán', 'math', 'algebra', 'geometry']):
+        return 'Toán học & Khoa học tính toán'
+    elif any(keyword in subject_lower for keyword in ['văn', 'literature', 'ngữ văn', 'tiếng việt']):
+        return 'Ngữ văn & Văn học'
+    elif any(keyword in subject_lower for keyword in ['english', 'tiếng anh', 'anh văn', 'tiếng']):
+        return 'Ngoại ngữ'
+    elif any(keyword in subject_lower for keyword in ['vật lý', 'physics']) and not any(keyword in subject_lower for keyword in ['địa lý', 'geography']):
+        return 'Vật lý'
+    elif any(keyword in subject_lower for keyword in ['địa lý', 'địa', 'geography']) and not any(keyword in subject_lower for keyword in ['vật lý', 'physics']):
+        return 'Địa lý'
+    elif any(keyword in subject_lower for keyword in ['hóa', 'chemistry', 'hóa học']):
+        return 'Hóa học'
+    elif any(keyword in subject_lower for keyword in ['sinh', 'biology', 'sinh học']):
+        return 'Sinh học'
+    elif any(keyword in subject_lower for keyword in ['sử', 'history', 'lịch sử']):
+        return 'Lịch sử'
+    elif any(keyword in subject_lower for keyword in ['tin học', 'computer', 'cntt', 'it']):
+        return 'Tin học & Công nghệ'
+    elif any(keyword in subject_lower for keyword in ['giáo dục', 'GDCD', 'giáo dục công dân']):
+        return 'Giáo dục công dân'
+    else:
+        return 'Môn học khác'
 
 
 @app.route('/doing-exam/<int:exam_id>')
@@ -452,6 +547,11 @@ def doing_exam(exam_id):
     if not student:
         flash('Không tìm thấy thông tin học sinh!', 'error')
         return redirect(url_for('index'))
+
+    is_creator = (current_user.id == exam.user_id)
+
+    if is_creator and not request.args.get('confirmed'):
+        flash('Lưu ý: Bạn là người tạo đề thi này. Kết quả của bạn sẽ không xuất hiện trong bảng xếp hạng để đảm bảo tính công bằng.','info')
 
     existing_session = dao.get_exam_session(student.id, exam_id)
 
@@ -577,7 +677,16 @@ def get_exam_questions(exam_id):
     if not exam:
         return jsonify({'error': 'Đề thi không tồn tại'}), 404
 
-    questions_data = dao.get_exam_questions_with_answers(exam_id)
+    student = dao.get_student_by_user_id(current_user.id)
+    if not student:
+        return jsonify({'error': 'Không tìm thấy thông tin học sinh'}), 404
+
+    session_obj = dao.get_exam_session(student.id, exam_id)
+
+    if session_obj and session_obj.question_order and session_obj.answer_orders:
+        questions_data = utils.get_ordered_questions_for_session(exam_id, session_obj.question_order, session_obj.answer_orders)
+    else:
+        questions_data = dao.get_exam_questions_with_answers(exam_id)
 
     return jsonify({
         'exam': {
@@ -634,14 +743,14 @@ def submit_exam():
     if not student:
         return jsonify({'error': 'Không tìm thấy thông tin học sinh'}), 404
 
-    remaining_time = dao.get_remaining_time_with_session(student.id, exam_id, exam.duration)
-    if remaining_time <= 0:
-        session_obj = dao.get_exam_session(student.id, exam_id)
-        if session_obj:
-            utils.complete_exam_session(session_obj)
-        return jsonify({'error': 'Thời gian làm bài đã hết'}), 400
+    is_creator = (current_user.id == exam.user_id)
 
-    actual_time_taken = (exam.duration * 60) - remaining_time
+    remaining_time = dao.get_remaining_time_with_session(student.id, exam_id, exam.duration)
+
+    if remaining_time <= 0:
+        actual_time_taken = exam.duration * 60
+    else:
+        actual_time_taken = (exam.duration * 60) - remaining_time
 
     score = utils.calculate_exam_score(exam_id, answers)
     result_id = utils.save_exam_result(student.id, exam_id, score, answers, actual_time_taken)
@@ -650,12 +759,15 @@ def submit_exam():
         session_obj = dao.get_exam_session(student.id, exam_id)
         if session_obj:
             utils.complete_exam_session(session_obj)
+        success_message = ('Bài thi đã được chấm điểm! (Kết quả không tham gia xếp hạng vì bạn là người tạo đề)' if is_creator else 'Bài thi đã được chấm điểm thành công!')
 
         return jsonify({
             'success': True,
             'score': score,
             'result_id': result_id,
-            'redirect_url': url_for('view_exam_result', result_id=result_id)
+            'is_creator': is_creator,
+            'message': success_message,
+            'redirect_url': url_for('view_exam_result', result_id=result_id, time_taken=time_taken)
         })
     else:
         return jsonify({'error': 'Lỗi khi lưu kết quả'}), 500

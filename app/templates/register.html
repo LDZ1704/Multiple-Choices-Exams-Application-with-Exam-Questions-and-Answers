@@ -17,32 +17,31 @@
         <div class="col-md-6 d-flex align-items-center justify-content-center">
             <div class="w-75">
                 <h3 class="mb-4 text-center">Đăng ký</h3>
-                {% if err_message %}
-                <div class="alert alert-danger">{{ err_message }}</div>
-                {% endif %}
                 <form method="post">
                     <div class="mb-3">
                         <label for="username" class="form-label">Tên tài khoản</label>
                         <input type="username" name="username" class="form-control" id="username"
-                               placeholder="Nhập tên tài khoản" required>
+                               placeholder="Nhập tên tài khoản" value="{{ username }}" required>
                     </div>
                     <div class="mb-3">
                         <label for="email" class="form-label">Email</label>
-                        <input type="email" name="email" class="form-control" id="email" placeholder="Nhập email"
+                        <input type="email" name="email" class="form-control" id="email" placeholder="Nhập email" value="{{ email }}"
                                required>
                     </div>
                     <div class="mb-3">
                         <label for="name" class="form-label">Họ và tên</label>
-                        <input type="name" name="name" class="form-control" id="name" placeholder="Nhập họ và tên"
+                        <input type="name" name="name" class="form-control" id="name" placeholder="Nhập họ và tên" value="{{ name }}"
                                required>
                     </div>
                     <div class="text-start mb-3">
                         <p>Giới tính</p>
                         <label>
-                            <input type="radio" name="gender" value="Male"> Male
+                            <input type="radio" name="gender" value="Male"
+                                   {{ 'checked' if gender == 'Male' else '' }}> Male
                         </label>
                         <label>
-                            <input type="radio" name="gender" value="Female"> Female
+                            <input type="radio" name="gender" value="Female"
+                                   {{ 'checked' if gender == 'Female' else '' }}> Female
                         </label>
                     </div>
                     <div class="mb-3">

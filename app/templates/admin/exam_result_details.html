@@ -3,12 +3,12 @@
 {% block body %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="page-title">Chi tiết kết quả thi</h2>
-    <a href="{{ return_url }}" class="btn btn-outline-secondary">
+    <a href="{{ url_for('examresult.index_view') }}" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left me-2"></i>Quay lại
     </a>
 </div>
 
-<div class="row">
+<div class="row mb-4">
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
@@ -31,59 +31,131 @@
                 <p><strong>Tên đề thi:</strong> {{ model.exam.exam_name if model.exam else 'N/A' }}</p>
                 <p><strong>Môn học:</strong> {{ model.exam.subject.subject_name if model.exam and model.exam.subject else 'N/A' }}</p>
                 <p><strong>Thời gian:</strong> {{ model.exam.duration if model.exam else 'N/A' }} phút</p>
-                <p><strong>Điểm số:</strong> <span class="badge bg-primary fs-6">{{ model.score }}/100</span></p>
+                <p><strong>Điểm số:</strong>
+                    {% if model.score >= 80 %}
+                        <span class="badge bg-success fs-6">{{ model.score }}/100</span>
+                    {% elif model.score >= 65 %}
+                        <span class="badge bg-primary fs-6">{{ model.score }}/100</span>
+                    {% elif model.score >= 50 %}
+                        <span class="badge bg-warning fs-6">{{ model.score }}/100</span>
+                    {% else %}
+                        <span class="badge bg-danger fs-6">{{ model.score }}/100</span>
+                    {% endif %}
+                </p>
             </div>
         </div>
     </div>
 </div>
 
-{% if model.user_answers %}
-<div class="card mt-4">
+<!-- Statistics Summary -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                {% set total_questions = model.exam.exam_questions|length if model.exam and model.exam.exam_questions else 0 %}
+                {% set correct_answers = 0 %}
+                {% if model.user_answers %}
+                    {% for question_id, answer_id in model.user_answers.items() %}
+                        {% set question = model.exam.exam_questions|selectattr('question_id', 'equalto', question_id|int)|first %}
+                        {% if question %}
+                            {% set user_answer = question.question.answers|selectattr('id', 'equalto', answer_id|int)|first %}
+                            {% if user_answer and user_answer.is_correct %}
+                                {% set correct_answers = correct_answers + 1 %}
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <h4 class="text-primary">{{ total_questions }}</h4>
+                        <small class="text-muted">Tổng câu hỏi</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 class="text-success">{{ correct_answers }}</h4>
+                        <small class="text-muted">Câu đúng</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 class="text-danger">{{ total_questions - correct_answers }}</h4>
+                        <small class="text-muted">Câu sai</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 class="text-warning">{{ "%.1f"|format((correct_answers/total_questions*100) if total_questions > 0 else 0) }}%</h4>
+                        <small class="text-muted">Tỷ lệ đúng</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Answers -->
+{% if model.user_answers and model.exam and model.exam.exam_questions %}
+<div class="card">
     <div class="card-header">
         <h5><i class="bi bi-list me-2"></i>Chi tiết câu trả lời</h5>
     </div>
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-striped">
-                <thead>
+            <table class="table table-hover">
+                <thead class="table-light">
                     <tr>
-                        <th>STT</th>
-                        <th>Câu hỏi</th>
-                        <th>Đáp án của học sinh</th>
-                        <th>Đáp án đúng</th>
-                        <th>Kết quả</th>
+                        <th width="5%">STT</th>
+                        <th width="40%">Câu hỏi</th>
+                        <th width="20%">Đáp án của học sinh</th>
+                        <th width="20%">Đáp án đúng</th>
+                        <th width="15%">Kết quả</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for question_id, answer_id in model.user_answers.items() %}
-                        {% set question = model.exam.exam_questions|selectattr('question_id', 'equalto', question_id|int)|first %}
-                        {% if question %}
-                            {% set user_answer = question.question.answers|selectattr('id', 'equalto', answer_id|int)|first %}
-                            {% set correct_answer = question.question.answers|selectattr('is_correct', 'equalto', true)|first %}
-                            <tr>
-                                <td>{{ loop.index }}</td>
-                                <td>{{ question.question.question_title[:50] }}...</td>
-                                <td>
-                                    {% if user_answer %}
+                    {% for exam_question in model.exam.exam_questions %}
+                        {% set user_answer_id = model.user_answers.get(exam_question.question_id|string) %}
+                        {% set user_answer = exam_question.question.answers|selectattr('id', 'equalto', user_answer_id|int)|first if user_answer_id else none %}
+                        {% set correct_answer = exam_question.question.answers|selectattr('is_correct', 'equalto', true)|first %}
+                        <tr>
+                            <td><strong>{{ loop.index }}</strong></td>
+                            <td>
+                                <div class="fw-medium">{{ exam_question.question.question_title }}</div>
+                                {% if exam_question.question.chapter %}
+                                    <small class="text-muted">Chương: {{ exam_question.question.chapter.chapter_name }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user_answer %}
+                                    <span class="badge bg-{{ 'success' if user_answer.is_correct else 'danger' }}">
                                         {{ user_answer.answer_text }}
-                                    {% else %}
-                                        <em class="text-muted">Không trả lời</em>
-                                    {% endif %}
-                                </td>
-                                <td>{{ correct_answer.answer_text if correct_answer else 'N/A' }}</td>
-                                <td>
-                                    {% if user_answer and user_answer.is_correct %}
-                                        <span class="badge bg-success">Đúng</span>
-                                    {% else %}
-                                        <span class="badge bg-danger">Sai</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% endif %}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Không trả lời</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if correct_answer %}
+                                    <span class="badge bg-success">{{ correct_answer.answer_text }}</span>
+                                {% else %}
+                                    <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user_answer and user_answer.is_correct %}
+                                    <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                                {% else %}
+                                    <i class="bi bi-x-circle-fill text-danger fs-5"></i>
+                                {% endif %}
+                            </td>
+                        </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body text-center">
+        <i class="bi bi-exclamation-triangle display-4 text-warning"></i>
+        <h5 class="mt-3">Không có dữ liệu chi tiết</h5>
+        <p class="text-muted">Không tìm thấy thông tin câu trả lời chi tiết cho bài thi này.</p>
     </div>
 </div>
 {% endif %}

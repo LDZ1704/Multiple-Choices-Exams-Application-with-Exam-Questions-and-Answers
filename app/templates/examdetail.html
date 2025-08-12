@@ -71,7 +71,7 @@
                 <button class="btn btn-outline-secondary btn-sm hover-underline-center" onclick="copyToClipboard()">
                     <i class="bi bi-link-45deg"></i> Sao chép link
                 </button>
-                <button class="btn btn-outline-primary btn-sm hover-underline-center"><i class="bi bi-qr-code-scan"></i> Quét mã QR</button>
+                <button class="btn btn-outline-primary btn-sm hover-underline-center" onclick="showQRCode()"><i class="bi bi-qr-code-scan"></i> Quét mã QR</button>
             </div>
         </div>
     </div>
@@ -168,6 +168,11 @@
                         Bình luận ({{ comments_pagination.total }})
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#ranking" id="ranking-tab">
+                        Xếp hạng ({{ ranking_stats.total_participants if ranking_stats else 0 }})
+                    </a>
+                </li>
                 {% if current_user.is_authenticated %}
                 <li class="nav-item">
                     <a class="nav-link" data-bs-toggle="tab" href="#results" id="results-tab">
@@ -187,8 +192,7 @@
                             <form method="POST" action="{{ url_for('add_exam_comment') }}">
                                 <input type="hidden" name="exam_id" value="{{ exam.id }}">
                                 <div class="mb-3">
-                                    <textarea class="form-control" name="content" rows="3"
-                                              placeholder="Chia sẻ cảm nhận của bạn về đề thi này..."></textarea>
+                                    <textarea class="form-control" name="content" rows="3" placeholder="Chia sẻ cảm nhận của bạn về đề thi này..."></textarea>
                                 </div>
                                 <button type="submit" class="btn btn-primary hover-underline-center" style="background-color: #384AD5;">Gửi bình luận</button>
                             </form>
@@ -290,6 +294,263 @@
                     {% endif %}
                 </div>
 
+                <!-- Tab Bảng xếp hạng -->
+                <div class="tab-pane fade" id="ranking">
+
+                    <!-- Thông báo cho người tạo đề -->
+                    {% if current_user.is_authenticated and current_user.id == exam.user_id %}
+                    <div class="alert alert-info border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);">
+                        <div class="d-flex align-items-start">
+                            <div class="flex-shrink-0 me-3">
+                                <i class="bi bi-person-check-fill text-primary fs-4"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="alert-heading fw-bold text-primary mb-2 fs-5">
+                                    <i class="bi bi-trophy me-1"></i>Thông báo cho người tạo đề
+                                </h6>
+                                <p class="mb-1 text-dark">
+                                    Bạn là người tạo ra đề thi này, vì vậy <strong>kết quả của bạn sẽ không được hiển thị trong bảng xếp hạng</strong>
+                                    để đảm bảo tính công bằng cho các thí sinh khác.
+                                </p>
+                                <small class="text-primary">
+                                    <i class="bi bi-lightbulb me-1"></i>
+                                    Bạn vẫn có thể làm bài để kiểm tra đề thi và xem kết quả trong mục "Kết quả ôn tập".
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Ô chú thích về quy tắc xếp hạng -->
+                    <div class="alert alert-info border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);">
+                        <div class="d-flex align-items-start">
+                            <div class="flex-shrink-0 me-3">
+                                <i class="bi bi-info-circle-fill text-primary fs-4"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="alert-heading fw-bold text-primary mb-2 fs-5">
+                                    <i class="bi bi-trophy me-1"></i>Quy tắc xếp hạng
+                                </h6>
+                                <ul class="mb-1 text-dark">
+                                    <li>Bảng xếp hạng chỉ tính <strong>lần làm bài đầu tiên</strong> của thí sinh</li>
+                                    <li><strong>Người tạo đề thi không tham gia xếp hạng</strong> để đảm bảo tính công bằng</li>
+                                    <li>Xếp hạng theo điểm số cao nhất, nếu bằng nhau thì ưu tiên người làm trước</li>
+                                </ul>
+                                <small class="text-primary">
+                                    <i class="bi bi-lightbulb me-1"></i>
+                                    Điều này đảm bảo tính công bằng và chất lượng của bảng xếp hạng.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if ranking_stats and ranking_stats.total_participants > 0 %}
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card text-center bg-light">
+                                <div class="card-body">
+                                    <i class="bi bi-people-fill text-info fs-2"></i>
+                                    <h5 class="card-title mt-2">{{ ranking_stats.total_participants }}</h5>
+                                    <p class="card-text text-muted">Thí sinh tham gia</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card text-center bg-light">
+                                <div class="card-body">
+                                    <i class="bi bi-graph-up text-success fs-2"></i>
+                                    <h5 class="card-title mt-2">{{ ranking_stats.avg_score }}/100</h5>
+                                    <p class="card-text text-muted">Điểm trung bình</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card text-center bg-light">
+                                <div class="card-body">
+                                    <i class="bi bi-trophy-fill text-warning fs-2"></i>
+                                    <h5 class="card-title mt-2">{{ ranking_stats.highest_score }}/100</h5>
+                                    <p class="card-text text-muted">Điểm cao nhất</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top 3 Podium -->
+                    {% if ranking_pagination.items|length >= 3 %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="text-center mb-3">🏆 Top 3 Xuất Sắc</h5>
+                            <div class="podium-container">
+                                <div class="podium-item second-place">
+                                    <img src="{{ ranking_pagination.items[1].avatar or url_for('static', filename='images/demo.png') }}"
+                                         class="podium-avatar" alt="Avatar">
+                                    <h6>{{ ranking_pagination.items[1].name }}</h6>
+                                    <div class="podium-score">{{ ranking_pagination.items[1].score }}/100</div>
+                                    <div class="podium-rank">
+                                        <i class="bi bi-award-fill"></i>
+                                        <span>2</span>
+                                    </div>
+                                </div>
+                                <div class="podium-item first-place">
+                                    <img src="{{ ranking_pagination.items[0].avatar or url_for('static', filename='images/demo.png') }}"
+                                         class="podium-avatar" alt="Avatar">
+                                    <h6>{{ ranking_pagination.items[0].name }}</h6>
+                                    <div class="podium-score">{{ ranking_pagination.items[0].score }}/100</div>
+                                    <div class="podium-rank">
+                                        <i class="bi bi-trophy-fill"></i>
+                                        <span>1</span>
+                                    </div>
+                                </div>
+                                <div class="podium-item third-place">
+                                    <img src="{{ ranking_pagination.items[2].avatar or url_for('static', filename='images/demo.png') }}"
+                                         class="podium-avatar" alt="Avatar">
+                                    <h6>{{ ranking_pagination.items[2].name }}</h6>
+                                    <div class="podium-score">{{ ranking_pagination.items[2].score }}/100</div>
+                                    <div class="podium-rank">
+                                        <i class="bi bi-award-fill"></i>
+                                        <span>3</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Bảng xếp hạng đầy đủ -->
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th width="80">Hạng</th>
+                                    <th>Thí sinh</th>
+                                    <th width="100">Điểm số</th>
+                                    <th width="200">Ngày thi</th>
+                                    <th width="150">Thời gian thi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for participant in ranking_pagination.items %}
+                                <tr class="{% if current_user.is_authenticated and current_user.student and current_user.student.id == participant.student_id %}table-warning{% endif %}">
+                                    <td>
+                                        <div class="rank-badge">
+                                            {% if participant.rank <= 5 %}
+                                                {% if participant.rank == 1 %}
+                                                    <i class="bi bi-trophy-fill text-warning"></i>
+                                                {% elif participant.rank == 2 %}
+                                                    <i class="bi bi-award-fill text-secondary"></i>
+                                                {% elif participant.rank == 3 %}
+                                                    <i class="bi bi-award-fill text-warning"></i>
+                                                {% elif participant.rank == 4 %}
+                                                    <i class="bi bi-star-fill text-primary"></i>
+                                                {% elif participant.rank == 5 %}
+                                                    <i class="bi bi-star-fill text-info"></i>
+                                                {% endif %}
+                                            {% endif %}
+                                            <span class="ms-1">#{{ participant.rank }}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <img src="{{ participant.avatar or url_for('static', filename='images/demo.png') }}" class="rounded-circle me-2" style="width: 32px; height: 32px;" alt="Avatar">
+                                            <div>
+                                                <span class="fw-bold">{{ participant.name }}</span>
+                                                {% if current_user.is_authenticated and current_user.student and current_user.student.id == participant.student_id %}
+                                                    <small class="text-primary d-block">Bạn</small>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if participant.score >= 80 %}bg-success{% elif participant.score >= 50 %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ participant.score }}/100
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small>{{ participant.taken_exam.strftime('%d/%m/%Y lúc %H:%M:%S') }}</small>
+                                    </td>
+                                    <td>
+                                        <span>
+                                            {% if participant.time_taken %}
+                                                {% set minutes = (participant.time_taken // 60) %}
+                                                {% set seconds = (participant.time_taken % 60) %}
+                                                {% if minutes > 0 %}
+                                                    {{ minutes }} phút {% if seconds > 0 %}{{ seconds }} giây{% endif %}
+                                                {% else %}
+                                                    {{ seconds }} giây
+                                                {% endif %}
+                                            {% else %}
+                                                --
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Phân trang xếp hạng -->
+                    {% if ranking_pagination.pages > 1 %}
+                    <nav aria-label="Ranking pagination" class="mt-3">
+                        <ul class="pagination justify-content-center">
+                            {% if ranking_pagination.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="?id={{ exam.id }}&ranking_page={{ ranking_pagination.prev_num }}#ranking" onclick="switchToRankingTab()">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+
+                            {% for page_num in ranking_pagination.iter_pages() %}
+                                {% if page_num %}
+                                    {% if page_num != ranking_pagination.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?id={{ exam.id }}&ranking_page={{ page_num }}#ranking" onclick="switchToRankingTab()">
+                                            {{ page_num }}
+                                        </a>
+                                    </li>
+                                    {% else %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                    {% endif %}
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">…</span>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if ranking_pagination.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?id={{ exam.id }}&ranking_page={{ ranking_pagination.next_num }}#ranking" onclick="switchToRankingTab()">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-trophy fs-1 text-muted"></i>
+                        <p class="mt-2 text-muted">
+                            {% if current_user.is_authenticated and current_user.id == exam.createBy_id %}
+                                Chưa có thí sinh nào làm bài thi này. Hãy chia sẻ đề thi để mọi người cùng tham gia!
+                            {% else %}
+                                Chưa có thí sinh nào làm bài thi này.
+                            {% endif %}
+                        </p>
+                        {% if current_user.is_authenticated and current_user.id != exam.user_id %}
+                        <a href="{{ url_for('doing_exam', exam_id=exam.id) }}" class="btn text-white text-decoration-none hover-underline-center" style="background: #384AD5;">
+                            <i class="bi bi-play-circle"></i> Hãy là người đầu tiên!
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+
                 <!-- Tab Kết quả ôn tập -->
                 {% if current_user.is_authenticated %}
                 <div class="tab-pane fade" id="results">
@@ -300,7 +561,7 @@
                             <tr>
                                 <th>Lần thi</th>
                                 <th>Điểm số</th>
-                                <th>Thời gian làm bài</th>
+                                <th>Thời gian đã làm bài</th>
                                 <th>Ngày thi</th>
                                 <th>Trạng thái</th>
                                 <th>Hành động</th>
@@ -315,8 +576,20 @@
                                         {{ result.score }}/100
                                     </span>
                                 </td>
-                                <td>{{ exam.duration }} phút</td>
-                                <td>{{ result.taken_exam.strftime('%H:%M %d/%m/%Y') }}</td>
+                                <td>
+                                    {% if result.time_taken %}
+                                        {% set minutes = (result.time_taken // 60) %}
+                                        {% set seconds = (result.time_taken % 60) %}
+                                        {% if minutes > 0 %}
+                                            {{ minutes }} phút {% if seconds > 0 %}{{ seconds }} giây{% endif %}
+                                        {% else %}
+                                            {{ seconds }} giây
+                                        {% endif %}
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </td>
+                                <td>{{ result.taken_exam.strftime('%H:%M:%S %d/%m/%Y') }}</td>
                                 <td>
                                     {% if result.score >= 50 %}
                                     <span class="text-success">Đạt</span>
@@ -485,6 +758,57 @@
     </div>
 </div>
 
+<!-- Modal QR Code -->
+<div class="modal fade" id="qrCodeModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-gradient text-white border-0"
+                 style="background: linear-gradient(135deg, #384AD5 0%, #5a67d8 100%);">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-qr-code me-2"></i>Mã QR Đề Thi
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <div id="qr-loading" class="mb-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Đang tạo mã QR...</span>
+                    </div>
+                    <p class="mt-2">Đang tạo mã QR...</p>
+                </div>
+
+                <div id="qr-content" style="display: none;">
+                    <div class="mb-3">
+                        <img id="qr-image" src="" alt="QR Code" class="img-fluid" style="max-width: 250px;">
+                    </div>
+                    <h6 id="qr-exam-name" class="fw-bold mb-2 fs-3"></h6>
+                    <p class="text-muted mb-3">Quét mã QR để truy cập đề thi</p>
+
+                    <div class="input-group mb-3">
+                        <input type="text" id="qr-url" class="form-control" readonly>
+                        <button class="btn btn-outline-secondary" type="button" onclick="copyQRUrl()">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="qr-error" style="display: none;" class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <span id="qr-error-message">Có lỗi xảy ra khi tạo mã QR</span>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">
+                    <i class="bi bi-x me-2"></i>Đóng
+                </button>
+                <button type="button" id="download-qr" class="btn btn-primary rounded-pill px-4" style="background: #384AD5; display: none;">
+                    <i class="bi bi-download me-2"></i>Tải xuống
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     const userAnswers = {{ (existing_session.user_answers | tojson) if existing_session and existing_session.user_answers else '{}' }};
     window.sessionData = {
@@ -640,6 +964,83 @@
 
         window.location.href = `/doing-exam/${examId}`;
     }
+
+    function switchToRankingTab() {
+        document.getElementById('ranking-tab').click();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.location.hash === '#ranking') {
+            document.getElementById('ranking-tab').click();
+        }
+    });
+
+    function showQRCode() {
+        const examId = getExamId();
+        if (!examId) {
+            alert('Không thể xác định bài thi!');
+            return;
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('qrCodeModal'));
+        modal.show();
+
+        document.getElementById('qr-loading').style.display = 'block';
+        document.getElementById('qr-content').style.display = 'none';
+        document.getElementById('qr-error').style.display = 'none';
+        document.getElementById('download-qr').style.display = 'none';
+
+        fetch(`/api/exam/${examId}/qr-code`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('qr-loading').style.display = 'none';
+
+                if (data.success) {
+                    document.getElementById('qr-image').src = data.qr_image;
+                    document.getElementById('qr-exam-name').textContent = data.exam_name;
+                    document.getElementById('qr-url').value = data.exam_url;
+                    document.getElementById('qr-content').style.display = 'block';
+                    document.getElementById('download-qr').style.display = 'inline-block';
+
+                    window.qrData = data.qr_image;
+                } else {
+                    document.getElementById('qr-error-message').textContent = data.error || 'Có lỗi xảy ra khi tạo mã QR';
+                    document.getElementById('qr-error').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('qr-loading').style.display = 'none';
+                document.getElementById('qr-error-message').textContent = 'Không thể kết nối tới máy chủ';
+                document.getElementById('qr-error').style.display = 'block';
+            });
+    }
+
+    function copyQRUrl() {
+        const urlInput = document.getElementById('qr-url');
+        urlInput.select();
+        urlInput.setSelectionRange(0, 99999);
+
+        try {
+            document.execCommand('copy');
+            const originalText = urlInput.nextElementSibling.innerHTML;
+            urlInput.nextElementSibling.innerHTML = '<i class="bi bi-check text-success"></i>';
+            setTimeout(() => {
+                urlInput.nextElementSibling.innerHTML = originalText;
+            }, 1000);
+        } catch (err) {
+            console.error('Không thể sao chép: ', err);
+        }
+    }
+
+    document.getElementById('download-qr').addEventListener('click', function() {
+        if (window.qrData) {
+            const link = document.createElement('a');
+            link.download = 'exam-qr-code.png';
+            link.href = window.qrData;
+            link.click();
+        }
+    });
 </script>
 
 {% endblock %}

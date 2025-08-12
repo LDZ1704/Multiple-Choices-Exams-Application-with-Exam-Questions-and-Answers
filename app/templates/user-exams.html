@@ -12,16 +12,13 @@
             <div class="d-flex gap-2">
                 {% if search_query %}
                 <a href="{{ url_for('user_exams') }}"
-                   class="btn btn-outline-danger d-flex align-items-center"
-                   title="Xóa bộ lọc tìm kiếm">
+                   class="btn btn-outline-danger d-flex align-items-center" title="Xóa bộ lọc tìm kiếm">
                     <i class="bi bi-x-circle-fill me-1"></i>
                     <span class="d-none d-md-inline">Xóa tìm kiếm</span>
                 </a>
                 {% endif %}
-                <div class="btn-group">
-                    <button type="button" class="btn btn-primary dropdown-toggle"
-                            data-bs-toggle="dropdown" aria-expanded="false"
-                            style="background: #384AD5;">
+                <div class="btn-group hover-underline-center">
+                    <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" style="background: #384AD5;">
                         <i class="bi bi-plus-circle me-1"></i>
                         Tạo đề thi
                     </button>
@@ -49,7 +46,7 @@
                 <input type="text" name="search" class="form-control"
                        placeholder="Tìm kiếm đề thi..."
                        value="{{ search_query if search_query else '' }}">
-                <button class="btn btn-primary" type="submit" style="background-color: #384AD5">
+                <button class="btn btn-primary hover-underline-center" type="submit" style="background-color: #384AD5">
                     <i class="bi bi-search"></i>
                 </button>
             </div>

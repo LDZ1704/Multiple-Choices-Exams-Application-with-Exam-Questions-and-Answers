@@ -3,137 +3,297 @@
 {% block content %}
 <section class="py-5">
     <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class="fw-bold text-primary fs-1">Danh sách các môn học</h2>
+            <button class="btn btn-outline-primary hover-underline-center" id="toggleTreeView">
+                <i class="bi bi-diagram-3"></i> Xem cây thư mục
+            </button>
         </div>
 
-        <!-- Search Form -->
+        <!-- Search and Filter Form -->
         <div class="row mb-4">
-            <div class="col-md-8 mx-auto">
-                <form method="GET" action="{{ url_for('subjects') }}" class="d-flex">
-                    <div class="input-group">
-                        <span class="input-group-text bg-light">
-                            <i class="bi bi-search text-muted"></i>
-                        </span>
-                        <input type="text"
-                               class="form-control form-control-lg"
-                               name="search"
-                               value="{{ search_query }}"
-                               placeholder="Tìm kiếm theo tên môn học hoặc tên đề thi..."
-                               autocomplete="off">
-                        <button class="btn btn-primary hover-underline-center" type="submit"
-                                style="background: #384AD5; border-color: #384AD5;">
-                            <i class="bi bi-search me-1"></i>Tìm kiếm
-                        </button>
-                        {% if search_query %}
-                        <a href="{{ url_for('subjects') }}"
-                           class="btn btn-outline-danger d-flex align-items-center"
-                           title="Xóa bộ lọc tìm kiếm">
-                            <i class="bi bi-x-circle-fill me-1"></i>
-                            <span class="d-none d-md-inline">Xóa tìm kiếm</span>
-                            <span class="d-md-none">Xóa</span>
-                        </a>
-                        {% endif %}
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <form method="GET" action="{{ url_for('subjects') }}" class="row g-3">
+                            <!-- Search Input -->
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light">
+                                        <i class="bi bi-search text-muted"></i>
+                                    </span>
+                                    <input type="text"
+                                           class="form-control"
+                                           name="search"
+                                           value="{{ search_query }}"
+                                           placeholder="Tìm kiếm theo tên môn học hoặc tên đề thi..."
+                                           autocomplete="off">
+                                </div>
+                            </div>
+
+                            <!-- Sort Dropdown -->
+                            <div class="col-md-3">
+                                <select class="form-select" name="sort">
+                                    <option value="name" {% if sort_by == 'name' %}selected{% endif %}>
+                                        Sắp xếp theo tên
+                                    </option>
+                                    <option value="exam_count" {% if sort_by == 'exam_count' %}selected{% endif %}>
+                                        Sắp xếp theo số đề thi
+                                    </option>
+                                    <option value="newest" {% if sort_by == 'newest' %}selected{% endif %}>
+                                        Mới nhất
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Filter Dropdown -->
+                            <div class="col-md-3">
+                                <select class="form-select" name="filter_exam">
+                                    <option value="" {% if filter_has_exam == '' %}selected{% endif %}>
+                                        Tất cả môn học
+                                    </option>
+                                    <option value="yes" {% if filter_has_exam == 'yes' %}selected{% endif %}>
+                                        Có đề thi
+                                    </option>
+                                    <option value="no" {% if filter_has_exam == 'no' %}selected{% endif %}>
+                                        Chưa có đề thi
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="col-12">
+                                <div class="d-flex gap-2 justify-content-end">
+                                    {% if search_query or sort_by != 'name' or filter_has_exam %}
+                                    <a href="{{ url_for('subjects') }}" class="btn btn-outline-danger hover-underline-center">
+                                        <i class="bi bi-x-circle-fill me-1"></i>Xóa bộ lọc
+                                    </a>
+                                    {% endif %}
+                                    <button class="btn btn-primary hover-underline-center" type="submit"
+                                            style="background: #384AD5; border-color: #384AD5;">
+                                        <i class="bi bi-search me-1"></i>Tìm kiếm & Lọc
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
 
-        <!-- Search Results Info -->
-        {% if search_query %}
-        <div class="alert alert-info d-flex align-items-center mb-4">
-            <i class="bi bi-info-circle me-2"></i>
-            <div>
-                Kết quả tìm kiếm cho: <strong>"{{ search_query }}"</strong>
-                {% if subjects_with_exams %}
-                - Tìm thấy trong {{ subjects_with_exams|length }} môn học
-                {% endif %}
+        <!-- Filter Results Info -->
+        {% if search_query or sort_by != 'name' or filter_has_exam %}
+        <div class="notification-box notification-warning">
+            <div class="notification-content">
+                <i class="bi bi-info-circle-fill notification-icon"></i>
+                <div class="notification-text small-text">
+                    {% if search_query %}
+                        Kết quả tìm kiếm cho: <strong>"{{ search_query }}"</strong>
+                    {% endif %}
+                    {% if filter_has_exam == 'yes' %}
+                        {% if search_query %} - {% endif %}Chỉ hiển thị môn học có đề thi
+                    {% elif filter_has_exam == 'no' %}
+                        {% if search_query %} - {% endif %}Chỉ hiển thị môn học chưa có đề thi
+                    {% endif %}
+                    {% if subjects_with_exams %}
+                        {% if search_query or filter_has_exam %} - {% endif %}Tìm thấy {{ subjects_with_exams|length }} môn học
+                    {% endif %}
+                </div>
             </div>
         </div>
         {% endif %}
 
-        {% if subjects_with_exams %}
-        {% for subject_data in subjects_with_exams %}
-        <div class="mb-5">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="fw-bold text-black">
-                    {{ subject_data.subject.subject_name }}:
-                    <span class="badge bg-info text-dark ms-2 fs-5">{{ subject_data.exam_count }} đề thi</span>
-                </h4>
+        <!-- Tree View -->
+        <div id="treeView" class="mb-4" style="display: none;">
+            <div class="card">
+                <div class="card-header text-white" style="background: #384AD5;">
+                    <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Cây thư mục môn học</h5>
+                </div>
+                <div class="card-body">
+                    {% for category, subjects in subjects_tree.items() %}
+                    <div class="mb-3">
+                        <h6 class="text-primary fw-bold">
+                            <i class="bi bi-folder2-open me-1"></i>{{ category }}
+                            <span class="badge bg-secondary ms-2">{{ subjects|length }}</span>
+                        </h6>
+                        <div class="ms-4">
+                            {% for subject in subjects %}
+                            <div class="mb-1">
+                                <i class="bi bi-file-earmark-text text-muted me-1"></i>
+                                <a href="javascript:void(0)"
+                                   class="text-decoration-none subject-filter"
+                                   data-subject-id="{{ subject.id }}">
+                                    {{ subject.subject_name }}
+                                </a>
+                                <span class="text-muted small ms-2">
+                                    ({{ dao.count_exams_by_subject(subject.id) }} đề thi)
+                                </span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
+        </div>
 
-            {% if subject_data.exams %}
-            <div class="row g-4">
-                {% for exam_data in subject_data.exams %}
-                <div class="col-md-3">
-                    <div class="card h-100 shadow-sm hover-card">
-                        <img src="{{ exam_data.exam.thumbnail or url_for('static', filename='images/demo.png') }}"
-                             class="card-img-top">
-                        <div class="card-body d-flex flex-column">
-                            <h6 class="card-title fw-bold">{{ exam_data.exam.exam_name }}</h6>
-                            <p class="text-muted mb-2">
-                                <i class="bi bi-calendar3"></i>
-                                {{ exam_data.exam.createAt.strftime('%d/%m/%Y') }}
-                            </p>
-                            <p class="text-muted mb-2">
-                                <i class="bi bi-question-circle"></i>
-                                {{ exam_data.question_count }} câu hỏi
-                            </p>
-                            <p class="text-muted mb-3">
-                                <i class="bi bi-people"></i> {{ exam_data.stats.total_attempts }} lượt thi
-                                &nbsp;
-                                <i class="bi bi-star"></i> {{ exam_data.stats.avg_score }}/100
-                            </p>
+        <!-- Main Content -->
+        <div id="mainView">
+            {% if subjects_with_exams %}
+            {% for subject_data in subjects_with_exams %}
+            <div class="mb-5 subject-section" data-subject-id="{{ subject_data.subject.id }}">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="fw-bold text-black">
+                        <i class="bi bi-book me-2 text-primary"></i>
+                        {{ subject_data.subject.subject_name }}:
+                        <span class="badge bg-info text-dark ms-2 fs-6">{{ subject_data.exam_count }} đề thi</span>
+                    </h4>
+                </div>
 
-                            {% if exam_data.exam.description %}
-                            <p class="card-text text-muted small mb-3">
-                                {{ exam_data.exam.description[:100] }}{% if exam_data.exam.description|length > 100
-                                %}...{% endif %}
-                            </p>
-                            {% endif %}
+                {% if subject_data.exams %}
+                <div class="row g-4">
+                    {% for exam_data in subject_data.exams %}
+                    <div class="col-lg-3 col-md-4 col-sm-6">
+                        <div class="card h-100 shadow-sm hover-card">
+                            <img src="{{ exam_data.exam.thumbnail or url_for('static', filename='images/demo.png') }}" class="card-img-top" style="height: 180px; object-fit: cover;">
+                            <div class="card-body d-flex flex-column">
+                                <h6 class="card-title fw-bold">{{ exam_data.exam.exam_name }}</h6>
 
-                            <div class="mt-auto">
-                                <button type="button" class="btn w-100 fs-6 text-white hover-underline-center"
-                                        style="background: #384AD5;">
-                                    <a href="{{ url_for('exam_detail', id=exam_data.exam.id) }}"
-                                       class="text-white text-decoration-none">
+                                <div class="mb-2">
+                                    <small class="text-muted d-block">
+                                        <i class="bi bi-calendar3 me-1"></i>
+                                        {{ exam_data.exam.createAt.strftime('%d/%m/%Y') }}
+                                    </small>
+                                    <small class="text-muted d-block">
+                                        <i class="bi bi-question-circle me-1"></i>
+                                        {{ exam_data.question_count }} câu hỏi
+                                        <i class="bi bi-clock ms-2 me-1"></i>
+                                        {{ exam_data.exam.duration }} phút
+                                    </small>
+                                    <small class="text-muted d-block">
+                                        <i class="bi bi-people me-1"></i> {{ exam_data.stats.total_attempts }} lượt thi
+                                        <i class="bi bi-star ms-2 me-1"></i> {{ exam_data.stats.avg_score }}/100
+                                    </small>
+                                </div>
+
+                                {% if exam_data.exam.description %}
+                                <p class="card-text text-muted small mb-3">
+                                    {{ exam_data.exam.description[:100] }}{% if exam_data.exam.description|length > 100 %}...{% endif %}
+                                </p>
+                                {% endif %}
+
+                                <div class="mt-auto">
+                                    <a href="{{ url_for('exam_detail', id=exam_data.exam.id) }}" class="btn btn-primary w-100 hover-underline-center" style="background: #384AD5; border-color: #384AD5;">
                                         <i class="bi bi-play-circle me-1"></i>Vào đề thi
                                     </a>
-                                </button>
+                                </div>
                             </div>
                         </div>
                     </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
+                {% else %}
+                <div class="text-center py-4 border rounded bg-light">
+                    <i class="bi bi-journal-x text-muted" style="font-size: 2rem;"></i>
+                    <p class="text-muted mt-2 mb-0">Chưa có đề thi nào cho môn học này</p>
+                </div>
+                {% endif %}
             </div>
+
+            {% if not loop.last %}
+            <hr class="my-4">
+            {% endif %}
+            {% endfor %}
             {% else %}
             <div class="text-center py-5">
-                <i class="bi bi-journal-x text-muted" style="font-size: 3rem;"></i>
-                <p class="text-muted mt-3">Chưa có đề thi nào cho môn học này</p>
+                {% if search_query or filter_has_exam %}
+                <i class="bi bi-search text-muted" style="font-size: 4rem;"></i>
+                <h4 class="text-muted mt-3">Không tìm thấy kết quả</h4>
+                <p class="text-muted">Không có môn học nào phù hợp với tiêu chí lọc của bạn</p>
+                <a href="{{ url_for('subjects') }}" class="btn mt-3 hover-underline-center text-white" style="background: #384AD5;">
+                    <i class="bi bi-arrow-left me-1"></i>Xem tất cả môn học
+                </a>
+                {% else %}
+                <i class="bi bi-book text-muted" style="font-size: 4rem;"></i>
+                <h4 class="text-muted mt-3">Chưa có môn học nào</h4>
+                <p class="text-muted">Hệ thống chưa có dữ liệu môn học để hiển thị</p>
+                {% endif %}
             </div>
             {% endif %}
         </div>
-
-        {% if not loop.last %}
-        <hr class="my-5">
-        {% endif %}
-        {% endfor %}
-        {% else %}
-        <div class="text-center py-5">
-            {% if search_query %}
-            <i class="bi bi-search text-muted" style="font-size: 4rem;"></i>
-            <h4 class="text-muted mt-3">Không tìm thấy kết quả</h4>
-            <p class="text-muted">Không có môn học hoặc đề thi nào phù hợp với từ khóa "{{ search_query }}"</p>
-            <a href="{{ url_for('subjects') }}" class="btn btn-primary mt-3 hover-underline-center" style="background: #384AD5;">
-                <i class="bi bi-arrow-left me-1"></i>Xem tất cả môn học
-            </a>
-            {% else %}
-            <i class="bi bi-book text-muted" style="font-size: 4rem;"></i>
-            <h4 class="text-muted mt-3">Chưa có môn học nào</h4>
-            <p class="text-muted">Hệ thống chưa có dữ liệu môn học để hiển thị</p>
-            {% endif %}
-        </div>
-        {% endif %}
     </div>
 </section>
+
+<script>
+document.getElementById('toggleTreeView').addEventListener('click', function() {
+    const treeView = document.getElementById('treeView');
+    const mainView = document.getElementById('mainView');
+    const button = this;
+
+    if (treeView.style.display === 'none') {
+        treeView.style.display = 'block';
+        mainView.style.display = 'none';
+        button.innerHTML = '<i class="bi bi-list"></i> Xem danh sách';
+    } else {
+        treeView.style.display = 'none';
+        mainView.style.display = 'block';
+        button.innerHTML = '<i class="bi bi-diagram-3"></i> Xem cây thư mục';
+    }
+});
+
+document.querySelectorAll('.subject-filter').forEach(function(link) {
+    link.addEventListener('click', function() {
+        const subjectId = this.getAttribute('data-subject-id');
+        filterBySubject(subjectId);
+    });
+});
+
+function filterBySubject(subjectId) {
+    const subjectSections = document.querySelectorAll('.subject-section');
+    const hrElements = document.querySelectorAll('#mainView hr');
+    let hasVisibleSections = false;
+
+    hrElements.forEach(function(hr) {
+        hr.style.display = 'none';
+    });
+
+    subjectSections.forEach(function(section) {
+        const sectionSubjectId = section.getAttribute('data-subject-id');
+
+        if (sectionSubjectId === subjectId) {
+            section.style.display = 'block';
+            hasVisibleSections = true;
+        } else {
+            section.style.display = 'none';
+        }
+    });
+
+    document.getElementById('treeView').style.display = 'none';
+    document.getElementById('mainView').style.display = 'block';
+    document.getElementById('toggleTreeView').innerHTML = '<i class="bi bi-diagram-3"></i> Xem cây thư mục';
+
+    if (!document.getElementById('backToAllBtn')) {
+        const backBtn = document.createElement('div');
+        backBtn.id = 'backToAllBtn';
+        backBtn.className = 'mb-3';
+        backBtn.innerHTML = '<button class="btn hover-underline-center text-white" style="background: #384AD5;" onclick="showAllSubjects()"><i class="bi bi-arrow-left me-1"></i>Xem tất cả môn học</button>';
+        document.getElementById('mainView').insertBefore(backBtn, document.getElementById('mainView').firstChild);
+    }
+}
+
+function showAllSubjects() {
+    document.querySelectorAll('.subject-section').forEach(function(section) {
+        section.style.display = 'block';
+    });
+
+    document.querySelectorAll('#mainView hr').forEach(function(hr) {
+        hr.style.display = 'block';
+    });
+
+    const backBtn = document.getElementById('backToAllBtn');
+    if (backBtn) {
+        backBtn.remove();
+    }
+}
+</script>
 {% endblock %}

@@ -7,6 +7,7 @@ from sqlalchemy import or_
 from app.models import User, Student, Admin, Exam, Subject, ExamResult, Question, Answer, ExamQuestions, Comment, \
     Chapter, ExamSession
 from app import db, utils
+from sqlalchemy import func, desc, asc, and_
 
 
 def auth_user(username, password, role=None):
@@ -25,7 +26,7 @@ def get_user_by_id(user_id):
 
 
 def get_user_by_email(email):
-    return User.query.filter_by(email=email).first()
+    return User.query.filter_by(email=email)
 
 
 def existence_check(table, attribute, value):
@@ -55,7 +56,7 @@ def check_email_exists(email, exclude_user_id=None):
     query = get_user_by_email(email)
     if exclude_user_id:
         query = query.filter(User.id != exclude_user_id)
-    return query is not None
+    return query.first() is not None
 
 
 def get_exams_with_pagination(page=1, per_page=6, search_query=None):
@@ -83,63 +84,58 @@ def get_exam_by_id(exam_id):
     return Exam.query.get(exam_id)
 
 
-def get_all_subjects_with_exams(search_query=None):
-    subjects = db.session.query(Subject).all()
-    subjects_with_exams = []
+def count_exams_by_subject(subject_id):
+    return Exam.query.filter_by(subject_id=subject_id).count()
 
+
+def get_all_subjects_with_exams(search_query=None, sort_by='name', filter_has_exam=''):
+    query = db.session.query(Subject).outerjoin(Exam)
+
+    if search_query:
+        search_pattern = f"%{search_query}%"
+        query = query.filter(or_(Subject.subject_name.ilike(search_pattern), Exam.exam_name.ilike(search_pattern)))
+
+    query = query.group_by(Subject.id)
+
+    if filter_has_exam == 'yes':
+        query = query.having(func.count(Exam.id) > 0)
+    elif filter_has_exam == 'no':
+        query = query.having(func.count(Exam.id) == 0)
+    if sort_by == 'exam_count':
+        query = query.order_by(desc(func.count(Exam.id)))
+    elif sort_by == 'newest':
+        query = query.order_by(desc(Subject.id))
+    else:
+        query = query.order_by(asc(Subject.subject_name))
+
+    subjects = query.all()
+
+    result = []
     for subject in subjects:
-        exams_query = db.session.query(Exam).filter_by(subject_id=subject.id)
+        exams_query = Exam.query.filter_by(subject_id=subject.id)
 
         if search_query:
-            exams_query = exams_query.filter(Exam.exam_name.contains(search_query))
+            exams_query = exams_query.filter(Exam.exam_name.ilike(f"%{search_query}%"))
 
-        exams = exams_query.order_by(Exam.createAt.desc()).all()
-        exams_with_stats = []
+        exams = exams_query.order_by(desc(Exam.createAt)).limit(12).all()
 
+        exam_data_list = []
         for exam in exams:
             stats = utils.get_exam_stats(exam.id)
             question_count = utils.count_exam_questions(exam.id)
-            exams_with_stats.append({
+            exam_data_list.append({
                 'exam': exam,
                 'stats': stats,
                 'question_count': question_count
             })
 
-        if not search_query or exams:
-            subjects_with_exams.append({
-                'subject': subject,
-                'exams': exams_with_stats,
-                'exam_count': len(exams)
-            })
+        result.append({
+            'subject': subject,
+            'exams': exam_data_list,
+            'exam_count': len(exams)
+        })
 
-    if search_query:
-        matching_subjects = db.session.query(Subject).filter(
-            Subject.subject_name.contains(search_query)
-        ).all()
-
-        for subject in matching_subjects:
-            already_added = any(s['subject'].id == subject.id for s in subjects_with_exams)
-
-            if not already_added:
-                exams = db.session.query(Exam).filter_by(subject_id=subject.id).order_by(Exam.createAt.desc()).all()
-                exams_with_stats = []
-
-                for exam in exams:
-                    stats = utils.get_exam_stats(exam.id)
-                    question_count = utils.count_exam_questions(exam.id)
-                    exams_with_stats.append({
-                        'exam': exam,
-                        'stats': stats,
-                        'question_count': question_count
-                    })
-
-                subjects_with_exams.append({
-                    'subject': subject,
-                    'exams': exams_with_stats,
-                    'exam_count': len(exams)
-                })
-
-    return subjects_with_exams
+    return result
 
 
 def get_subject_by_id(subject_id):
@@ -245,13 +241,13 @@ def get_exam_history_with_pagination(student_id, page=1, per_page=10, search_que
         query = query.filter(Subject.id == selected_subject)
 
     if score_filter:
-        if score_filter == 'excellent':
+        if score_filter == 'Giỏi':
             query = query.filter(ExamResult.score >= 80)
-        elif score_filter == 'good':
+        elif score_filter == 'Khá':
             query = query.filter(ExamResult.score >= 65, ExamResult.score < 80)
-        elif score_filter == 'average':
+        elif score_filter == 'Trung bình':
             query = query.filter(ExamResult.score >= 50, ExamResult.score < 65)
-        elif score_filter == 'poor':
+        elif score_filter == 'Yếu':
             query = query.filter(ExamResult.score < 50)
 
     query = query.order_by(ExamResult.taken_exam.desc())
@@ -269,17 +265,36 @@ def get_all_subjects():
 
 def get_exam_result_with_details(result_id, student_id=None):
     try:
-        query = db.session.query(ExamResult).filter(ExamResult.id == result_id)
-
-        if student_id:
-            query = query.filter(ExamResult.student_id == student_id)
-
-        result = query.first()
-
+        result = (db.session.query(ExamResult).filter(ExamResult.id == result_id, ExamResult.student_id == student_id).first())
         if not result:
             return None
 
-        questions_with_answers = get_exam_questions_with_user_answers(result.exam_id, result.id)
+        session_obj = (db.session.query(ExamSession)
+                       .filter(ExamSession.student_id == student_id, ExamSession.exam_id == result.exam_id, ExamSession.is_completed == True)
+                       .order_by(ExamSession.start_time.desc())
+                       .first())
+
+        if session_obj and session_obj.question_order and session_obj.answer_orders:
+            questions_data = utils.get_ordered_questions_for_session(result.exam_id, session_obj.question_order, session_obj.answer_orders)
+        else:
+            questions_data = get_exam_questions_with_answers(result.exam_id)
+
+        questions_with_answers = []
+        user_answers = result.user_answers or {}
+
+        for question_data in questions_data:
+            user_answer_id = user_answers.get(str(question_data['id']))
+
+            correct_answer = next((a for a in question_data['answers'] if a['is_correct']), None)
+            is_correct = user_answer_id == correct_answer['id'] if correct_answer and user_answer_id else False
+
+            questions_with_answers.append({
+                'question': question_data,
+                'answers': question_data['answers'],
+                'user_answer_id': user_answer_id,
+                'correct_answer_id': correct_answer['id'] if correct_answer else None,
+                'is_correct': is_correct
+            })
 
         return {
             'result': result,
@@ -287,7 +302,7 @@ def get_exam_result_with_details(result_id, student_id=None):
         }
 
     except Exception as e:
-        print(f"Lỗi khi lấy kết quả chi tiết: {e}")
+        print(f"Error getting exam result: {e}")
         return None
 
 
@@ -478,3 +493,76 @@ def has_exam_result(student_id, exam_id):
     except Exception as e:
         print(f"Lỗi khi kiểm tra kết quả: {e}")
         return False
+
+
+def get_exam_ranking_with_pagination(exam_id, page=1, per_page=20):
+    exam = get_exam_by_id(exam_id)
+    if not exam:
+        return None
+
+    creator_user_id = exam.user_id
+
+    query = db.session.query(
+        ExamResult.id,
+        ExamResult.student_id,
+        ExamResult.score,
+        ExamResult.taken_exam,
+        ExamResult.time_taken,
+        User.name,
+        User.avatar,
+        func.row_number().over(order_by=[ExamResult.score.desc(), ExamResult.taken_exam.asc()]).label('rank')
+    ).select_from(ExamResult) \
+        .join(Student, ExamResult.student_id == Student.id) \
+        .join(User, Student.user_id == User.id) \
+        .filter(
+        and_(ExamResult.exam_id == exam_id, ExamResult.is_first_attempt == True, User.id != creator_user_id)
+    ).order_by(ExamResult.score.desc(), ExamResult.taken_exam.asc())
+
+    return query.paginate(
+        page=page,
+        per_page=per_page,
+        error_out=False
+    )
+
+
+def get_exam_highest_score(exam_id):
+    exam = get_exam_by_id(exam_id)
+    if not exam:
+        return 0
+
+    creator_user_id = exam.user_id
+
+    result = db.session.query(func.max(ExamResult.score)) \
+        .join(Student, ExamResult.student_id == Student.id) \
+        .join(User, Student.user_id == User.id) \
+        .filter(and_(ExamResult.exam_id == exam_id, ExamResult.is_first_attempt == True, User.id != creator_user_id)).scalar()
+
+    return result if result else 0
+
+
+def count_exam_participants(exam_id):
+    exam = get_exam_by_id(exam_id)
+    if not exam:
+        return 0
+
+    creator_user_id = exam.user_id
+
+    return db.session.query(ExamResult.student_id) \
+        .join(Student, ExamResult.student_id == Student.id) \
+        .join(User, Student.user_id == User.id) \
+        .filter(and_(ExamResult.exam_id == exam_id, ExamResult.is_first_attempt == True, User.id != creator_user_id)).distinct().count()
+
+
+def get_exam_average_score(exam_id):
+    exam = get_exam_by_id(exam_id)
+    if not exam:
+        return 0
+
+    creator_user_id = exam.user_id
+
+    result = db.session.query(func.avg(ExamResult.score)) \
+        .join(Student, ExamResult.student_id == Student.id) \
+        .join(User, Student.user_id == User.id) \
+        .filter(and_(ExamResult.exam_id == exam_id, ExamResult.is_first_attempt == True, User.id != creator_user_id)).scalar()
+
+    return round(result, 1) if result else 0
