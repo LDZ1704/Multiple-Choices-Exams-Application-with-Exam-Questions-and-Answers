@@ -1,230 +1,247 @@
 {% extends 'admin/master.html' %}
-{% import 'admin/lib.html' as lib with context %}
 
-{% set active_filters = active_filters or [] %}
+{% block title %}{{ 'Chỉnh sửa' if model else 'Thêm mới' }} {{ admin_view.name }} - LmaoQuiz Admin{% endblock %}
 
-{% block head_tail %}
-{{ super() }}
-<style>
-.btn-primary {
-    background: #384AD5;
-    border-color: #384AD5;
-}
-.btn-primary:hover {
-    background: #2c3bb5;
-    border-color: #2c3bb5;
-}
-.card {
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-}
-.page-title {
-    color: #384AD5;
-    font-weight: 600;
-}
-.required {
-    color: #dc3545;
-}
-.form-label {
-    font-weight: 600;
-    color: #495057;
-}
-.form-text {
-    font-size: 0.875em;
-    color: #6c757d;
-}
-</style>
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{{ return_url }}">{{ admin_view.name }}</a></li>
+<li class="breadcrumb-item active">{{ 'Chỉnh sửa' if model else 'Thêm mới' }}</li>
 {% endblock %}
 
 {% block body %}
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="page-title">{{ 'Chỉnh sửa' if request.endpoint.endswith('edit_view') else 'Thêm mới' }} {{ admin_view.name }}</h2>
+<div class="page-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h1>{{ 'Chỉnh sửa' if model else 'Thêm mới' }} {{ admin_view.name }}</h1>
+            <p class="text-muted mb-0">
+                {% if model %}
+                Cập nhật thông tin {{ admin_view.name|lower }}
+                {% else %}
+                Tạo {{ admin_view.name|lower }} mới
+                {% endif %}
+            </p>
+        </div>
         <div>
             <a href="{{ return_url }}" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left me-2"></i>Quay lại
             </a>
         </div>
     </div>
+</div>
 
-    <!-- Form Card -->
-    <div class="card">
-        <div class="card-header bg-light">
-            <h5 class="card-title mb-0">
-                <i class="bi bi-{{ 'pencil-square' if request.endpoint.endswith('edit_view') else 'plus-circle' }} me-2"></i>
-                {{ 'Cập nhật' if request.endpoint.endswith('edit_view') else 'Thêm' }} thông tin {{ admin_view.name }}
-            </h5>
-        </div>
-        <div class="card-body">
-            {% if form %}
-            <form method="POST" enctype="multipart/form-data" role="form">
-                {% if form.hidden_tag %}{{ form.hidden_tag() }}{% endif %}
-
-                {% for field in form %}
-                    {% if field.name != 'csrf_token' %}
-                        {% set skip_field = false %}
-                        {% set field_name = field.name %}
-                        {% set field_type = 'StringField' %}
-                        {% set widget_type = 'text' %}
-
-                        {# Safely get field type #}
-                        {% if field.type %}
-                            {% set field_type = field.type %}
-                        {% endif %}
-
-                        {# Safely get widget type #}
-                        {% if field.widget %}
-                            {% if field.widget.input_type %}
-                                {% set widget_type = field.widget.input_type %}
-                            {% endif %}
-                        {% endif %}
-
-                        {# Skip hidden fields and problem fields #}
-                        {% if widget_type == 'hidden' or field_type == 'HiddenField' %}
-                            {% set skip_field = true %}
-                        {% endif %}
-
-                        {% if not skip_field %}
+<form method="POST" enctype="multipart/form-data">
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-pencil me-2"></i>Thông tin chi tiết
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for field in form %}
                         <div class="mb-3">
-                            {# Safely render label #}
-                            {% if field_type != 'BooleanField' %}
-                                <label class="form-label" for="{{ field.id }}">{{ field.label.text }}</label>
-                                {% if field.flags and field.flags.required %}
-                                <span class="text-danger">*</span>
+                            <label for="{{ field.id }}" class="form-label">
+                                {{ field.label.text }}
+                                {% if field.flags.required %}
+                                    <span class="text-danger">*</span>
                                 {% endif %}
-                            {% endif %}
+                            </label>
 
-                            {# Render field based on type #}
-                            {% if field_type in ['SelectField', 'QuerySelectField'] %}
-                                {{ field(class="form-select") }}
-                            {% elif field_type == 'BooleanField' %}
+                            {# ----- Text, Email, Password, Number ----- #}
+                            {% if field.type in ['StringField', 'IntegerField', 'FloatField', 'EmailField', 'PasswordField'] %}
+                                {{ field(class="form-control") }}
+
+                            {# ----- TextArea ----- #}
+                            {% elif field.type in ['TextAreaField'] %}
+                                {{ field(class="form-control", rows="4") }}
+
+                            {# ----- Select / QuerySelect ----- #}
+                            {% elif field.type in ['SelectField', 'QuerySelectField'] %}
+                                <select id="{{ field.id }}" name="{{ field.name }}" class="form-select">
+                                    {% for choice in field.iter_choices() %}
+                                        {% if choice|length == 3 %}
+                                            {% set val, label, selected = choice %}
+                                            <option value="{{ val }}" {% if selected %}selected{% endif %}>{{ label }}</option>
+                                        {% else %}
+                                            {% set val, label, selected, render_kw = choice %}
+                                            <option value="{{ val }}" {% if selected %}selected{% endif %}>{{ label }}</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+
+                            {# ----- Boolean ----- #}
+                            {% elif field.type in ['BooleanField'] %}
                                 <div class="form-check">
                                     {{ field(class="form-check-input") }}
                                     <label class="form-check-label" for="{{ field.id }}">{{ field.label.text }}</label>
                                 </div>
-                            {% elif field_type == 'TextAreaField' %}
-                                {{ field(class="form-control", rows="4") }}
-                            {% elif field_type == 'PasswordField' %}
-                                {% if request.endpoint.endswith('edit_view') %}
-                                    {{ field(class="form-control", placeholder="Để trống nếu không muốn đổi mật khẩu") }}
-                                {% else %}
-                                    {{ field(class="form-control", placeholder="Nhập mật khẩu") }}
-                                {% endif %}
-                            {% elif field_type in ['IntegerField', 'DecimalField'] %}
-                                {% if field_name == 'duration' %}
-                                    <div class="input-group">
-                                        {{ field(class="form-control", type="number", min="1", max="300") }}
-                                        <span class="input-group-text">phút</span>
+
+                            {# ----- File upload ----- #}
+                            {% elif field.type in ['FileField'] %}
+                                {{ field(class="form-control") }}
+                                {% if model and field.name in model.__dict__ and model.__dict__[field.name] %}
+                                    <div class="alert alert-info mt-2">
+                                        File hiện tại: <strong>{{ model.__dict__[field.name] }}</strong>
                                     </div>
-                                {% elif field_name == 'score' %}
-                                    {{ field(class="form-control", type="number", min="0", max="100", step="0.1") }}
-                                {% else %}
-                                    {{ field(class="form-control", type="number") }}
                                 {% endif %}
-                            {% elif field_type == 'DateTimeField' %}
+
+                            {# ----- Date / DateTime ----- #}
+                            {% elif field.type in ['DateField'] %}
+                                {{ field(class="form-control", type="date") }}
+                            {% elif field.type in ['DateTimeField'] %}
                                 {{ field(class="form-control", type="datetime-local") }}
-                            {% elif field_name == 'email' %}
-                                {{ field(class="form-control", type="email") }}
-                            {% elif field_type == 'FileField' %}
-                                {{ field(class="form-control", type="file") }}
+
+                            {# ----- Mặc định ----- #}
                             {% else %}
                                 {{ field(class="form-control") }}
                             {% endif %}
 
-                            {# Safely show description #}
-                            {% if field.description %}
-                            <div class="form-text">{{ field.description }}</div>
-                            {% endif %}
-
-                            {# Safely show errors #}
+                            {# Hiển thị lỗi nếu có #}
                             {% if field.errors %}
+                            <div class="invalid-feedback d-block">
                                 {% for error in field.errors %}
-                                <div class="text-danger small">{{ error }}</div>
+                                <div>{{ error }}</div>
                                 {% endfor %}
+                            </div>
                             {% endif %}
                         </div>
-                        {% endif %}
-                    {% endif %}
-                {% endfor %}
-
-                <hr>
-                <div class="d-flex justify-content-end gap-2">
-                    <a href="{{ return_url }}" class="btn btn-outline-secondary">
-                        <i class="bi bi-x-circle me-2"></i>Hủy
-                    </a>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-circle me-2"></i>{{ 'Cập nhật' if request.endpoint.endswith('edit_view') else 'Lưu' }}
-                    </button>
+                    {% endfor %}
                 </div>
-            </form>
-            {% else %}
-            <div class="alert alert-warning">
-                <i class="bi bi-exclamation-triangle me-2"></i>
-                Không thể hiển thị form. Vui lòng thử lại sau.
             </div>
-            {% endif %}
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Actions Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-gear me-2"></i>Thao tác
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button type="submit" name="btn_submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-2"></i>
+                            {% if model %}Cập nhật{% else %}Lưu{% endif %}
+                        </button>
+
+                        {% if admin_view.can_edit %}
+                        <button type="submit" name="btn_submit_edit" class="btn btn-outline-success">
+                            <i class="bi bi-check-lg me-2"></i>
+                            {% if model %}Cập nhật{% else %}Lưu{% endif %} và tiếp tục chỉnh sửa
+                        </button>
+                        {% endif %}
+
+                        {% if admin_view.can_create %}
+                        <button type="submit" name="btn_submit_new" class="btn btn-outline-info">
+                            <i class="bi bi-plus-lg me-2"></i>
+                            {% if model %}Cập nhật{% else %}Lưu{% endif %} và thêm mới
+                        </button>
+                        {% endif %}
+
+                        <a href="{{ return_url }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-2"></i>Hủy
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Help Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle me-2"></i>Trợ giúp
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <i class="bi bi-asterisk text-danger me-2"></i>
+                            <small>Các trường có dấu * là bắt buộc</small>
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-shield-check text-success me-2"></i>
+                            <small>Dữ liệu sẽ được kiểm tra trước khi lưu</small>
+                        </li>
+                        <li>
+                            <i class="bi bi-arrow-clockwise text-info me-2"></i>
+                            <small>Có thể hủy bỏ thay đổi bằng nút "Hủy"</small>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<!-- Delete Modal (if editing) -->
+{% if model and admin_view.can_delete %}
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Xác nhận xóa
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">Bạn có chắc chắn muốn xóa {{ admin_view.name|lower }} này?</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Cảnh báo:</strong> Hành động này không thể hoàn tác!
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <form method="POST" action="{{ url_for('.delete_view') }}" class="d-inline">
+                    <input type="hidden" name="id" value="{{ model.id }}">
+                    <input type="hidden" name="url" value="{{ return_url }}">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash me-2"></i>Xóa
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 </div>
 
+<!-- Delete Button -->
+<div class="row mt-3">
+    <div class="col-12">
+        <div class="card border-danger">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-danger mb-1">Vùng nguy hiểm</h6>
+                        <small class="text-muted">Xóa {{ admin_view.name|lower }} này vĩnh viễn</small>
+                    </div>
+                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
+                            data-bs-target="#deleteModal">
+                        <i class="bi bi-trash me-2"></i>Xóa
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <script>
-// Form validation
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.querySelector('form');
-    if (form) {
-        form.addEventListener('submit', function(e) {
-            const requiredFields = form.querySelectorAll('[required]');
-            let hasErrors = false;
+    function togglePassword(button) {
+        const input = button.previousElementSibling;
+        const icon = button.querySelector('i');
 
-            requiredFields.forEach(function(field) {
-                if (!field.value.trim()) {
-                    field.classList.add('is-invalid');
-                    hasErrors = true;
-                } else {
-                    field.classList.remove('is-invalid');
-                }
-            });
-
-            if (hasErrors) {
-                e.preventDefault();
-                alert('Vui lòng điền đầy đủ thông tin bắt buộc.');
-            }
-        });
-    }
-
-    // Auto-resize textarea
-    const textareas = document.querySelectorAll('textarea');
-    textareas.forEach(function(textarea) {
-        textarea.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = (this.scrollHeight) + 'px';
-        });
-    });
-
-    // Show/hide password fields
-    const passwordFields = document.querySelectorAll('input[type="password"]');
-    passwordFields.forEach(function(field) {
-        if (field.name.includes('new_password')) {
-            const wrapper = field.closest('.mb-3');
-            const toggle = document.createElement('button');
-            toggle.type = 'button';
-            toggle.className = 'btn btn-outline-secondary btn-sm mt-2';
-            toggle.innerHTML = '<i class="bi bi-eye"></i> Hiện mật khẩu';
-
-            toggle.addEventListener('click', function() {
-                if (field.type === 'password') {
-                    field.type = 'text';
-                    toggle.innerHTML = '<i class="bi bi-eye-slash"></i> Ẩn mật khẩu';
-                } else {
-                    field.type = 'password';
-                    toggle.innerHTML = '<i class="bi bi-eye"></i> Hiện mật khẩu';
-                }
-            });
-
-            wrapper.appendChild(toggle);
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
         }
-    });
-});
+    }
 </script>
 {% endblock %}

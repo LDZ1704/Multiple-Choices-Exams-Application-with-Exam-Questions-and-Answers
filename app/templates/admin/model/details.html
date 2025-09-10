@@ -1,390 +1,341 @@
 {% extends 'admin/master.html' %}
-{% import 'admin/lib.html' as lib with context %}
 
-{% block head_tail %}
-{{ super() }}
-<style>
-.btn-primary {
-    background: #384AD5;
-    border-color: #384AD5;
-}
-.btn-primary:hover {
-    background: #2c3bb5;
-    border-color: #2c3bb5;
-}
-.card {
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-}
-.page-title {
-    color: #384AD5;
-    font-weight: 600;
-}
-.form-control-plaintext {
-    padding: 0.375rem 0.75rem;
-    border: 1px solid #e9ecef;
-    border-radius: 0.375rem;
-    background-color: #f8f9fa;
-    color: #495057;
-}
-.form-label {
-    font-weight: 600;
-    color: #495057;
-    margin-bottom: 0.5rem;
-}
-.detail-section {
-    border-left: 4px solid #384AD5;
-    background-color: #f8f9fa;
-    padding: 1rem;
-    margin-bottom: 1rem;
-}
-.badge {
-    font-size: 0.85em;
-}
-.relationship-item {
-    border: 1px solid #dee2e6;
-    border-radius: 0.375rem;
-    padding: 0.75rem;
-    margin-bottom: 0.5rem;
-    background-color: #ffffff;
-}
-</style>
+{% block title %}{{ 'Chỉnh sửa' if model else 'Thêm mới' }} {{ admin_view.name }} - LmaoQuiz Admin{% endblock %}
+
+{% block breadcrumb %}
+    <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ return_url }}">{{ admin_view.name }}</a></li>
+    <li class="breadcrumb-item active">Chi tiết</li>
 {% endblock %}
 
 {% block body %}
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="page-title">Chi tiết {{ admin_view.name }}</h2>
+<div class="page-header">
+    <div class="d-flex justify-content-between align-items-center">
         <div>
+            <h1>Chi tiết {{ admin_view.name }}</h1>
+            <p class="text-muted mb-0">Xem thông tin chi tiết {{ admin_view.name|lower }}</p>
+        </div>
+        <div class="btn-group">
             {% if admin_view.can_edit %}
-                <a href="{{ admin_view.get_url('.edit_view', id=request.args.get('id'), url=return_url) }}" class="btn btn-outline-primary">
-                    <i class="bi bi-pencil me-2"></i>Chỉnh sửa
-                </a>
+            <a href="{{ url_for('.edit_view', id=model.id, url=return_url) }}" class="btn btn-primary">
+                <i class="bi bi-pencil me-2"></i>Chỉnh sửa
+            </a>
             {% endif %}
+
             {% if admin_view.can_delete %}
-                <form style="display: inline;" method="POST" action="{{ admin_view.get_url('.delete_view', id=request.args.get('id'), url=return_url) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa bản ghi này? Thao tác này không thể hoàn tác.')">
-                    <button type="submit" class="btn btn-outline-danger ms-2">
-                        <i class="bi bi-trash me-2"></i>Xóa
-                    </button>
-                </form>
+            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                <i class="bi bi-trash me-2"></i>Xóa
+            </button>
             {% endif %}
-            <a href="{{ return_url }}" class="btn btn-outline-secondary ms-2">
+
+            <a href="{{ return_url }}" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left me-2"></i>Quay lại
             </a>
         </div>
     </div>
+</div>
 
-    {% if model %}
-    <!-- Basic Information -->
-    <div class="card mb-4">
-        <div class="card-header bg-light">
-            <h5 class="card-title mb-0">
-                <i class="bi bi-info-circle me-2"></i>Thông tin cơ bản
-            </h5>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-2">
-                    <label class="form-label">ID</label>
-                    <div class="form-control-plaintext">{{ model.id }}</div>
-                </div>
-                {% for column in admin_view.column_list if column != 'id' %}
-                    {% set value = model[column] if model and model[column] is defined else None %}
-                    {% if value is not none and value != '' %}
-                    <div class="col-md-{% if loop.index <= 1 %}6{% else %}4{% endif %} mb-3">
-                        <label class="form-label">{{ admin_view.column_labels.get(column, column|title) }}</label>
-                        <div class="form-control-plaintext">
-                            {% if column == 'role' and value %}
-                                {% if value.name is defined %}
-                                    {% if value.name == 'ADMIN' %}
-                                        <span class="badge bg-danger">Quản trị viên</span>
-                                    {% elif value.name == 'STUDENT' %}
-                                        <span class="badge bg-primary">Học sinh</span>
-                                    {% else %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-info-circle me-2"></i>Thông tin chi tiết
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for c, name in details_columns %}
+                    <div class="col-md-6 mb-4">
+                        <div class="detail-item">
+                            <label class="detail-label">{{ name }}</label>
+                            <div class="detail-value">
+                                {% if admin_view.column_formatters and c in admin_view.column_formatters %}
+                                    {{ admin_view.column_formatters[c](admin_view, None, model, c)|safe }}
+                                {% else %}
+                                    {% set value = model[c] if model[c] is defined else None %}
+                                    {% if value is none %}
+                                        <span class="text-muted">-</span>
+                                    {% elif value is boolean %}
+                                        {% if value %}
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check-circle me-1"></i>Có
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">
+                                                <i class="bi bi-x-circle me-1"></i>Không
+                                            </span>
+                                        {% endif %}
+                                    {% elif value.__class__.__name__ == 'datetime' %}
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-calendar me-2 text-muted"></i>
+                                            {{ value.strftime('%d/%m/%Y %H:%M:%S') }}
+                                        </div>
+                                    {% elif value.__class__.__name__ == 'date' %}
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-calendar-date me-2 text-muted"></i>
+                                            {{ value.strftime('%d/%m/%Y') }}
+                                        </div>
+                                    {% elif c == 'email' %}
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-envelope me-2 text-muted"></i>
+                                            <a href="mailto:{{ value }}" class="text-decoration-none">{{ value }}</a>
+                                        </div>
+                                    {% elif c == 'avatar' or c.endswith('_image') or c.endswith('_photo') %}
+                                        {% if value %}
+                                            <div class="d-flex align-items-center">
+                                                <img src="{{ value }}" alt="Image" class="img-thumbnail me-2" style="max-width: 100px; max-height: 100px;">
+                                                <a href="{{ value }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-eye me-1"></i>Xem
+                                                </a>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">Không có hình ảnh</span>
+                                        {% endif %}
+                                    {% elif c.endswith('_url') or c.startswith('http') %}
+                                        {% if value %}
+                                            <div class="d-flex align-items-center">
+                                                <i class="bi bi-link me-2 text-muted"></i>
+                                                <a href="{{ value }}" target="_blank" class="text-decoration-none">{{ value }}</a>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    {% elif value.subject_name is defined %}
+                                        {{ value.subject_name }}
+                                    {% elif value.chapter_name is defined %}
+                                        {{ value.chapter_name }}
+                                    {% elif value.question_title is defined %}
+                                        {{ value.question_title|truncate(50) }}
+                                    {% elif value.exam_name is defined %}
+                                        {{ value.exam_name }}
+                                    {% elif value.name is defined %}
                                         {{ value.name }}
+                                    {% elif value.username is defined %}
+                                        {{ value.username }}
+                                    {% elif value|string|length > 100 %}
+                                        <div class="expandable-text">
+                                            <div class="text-preview">{{ value|string|truncate(100, True) }}</div>
+                                            <div class="text-full d-none">{{ value }}</div>
+                                            <button type="button" class="btn btn-sm btn-link p-0 mt-1" onclick="toggleText(this)">
+                                                Xem thêm
+                                            </button>
+                                        </div>
+                                    {% else %}
+                                        {{ value }}
                                     {% endif %}
-                                {% else %}
-                                    {{ value }}
                                 {% endif %}
-                            {% elif column in ['subject', 'chapter', 'question', 'user', 'exam', 'student'] and value %}
-                                <!-- Xử lý foreign key relationships -->
-                                {% if value.subject_name is defined %}
-                                    {{ value.subject_name }}
-                                {% elif value.chapter_name is defined %}
-                                    {{ value.chapter_name }}
-                                {% elif value.question_title is defined %}
-                                    {{ value.question_title|truncate(50) }}
-                                {% elif value.name is defined %}
-                                    {{ value.name }}
-                                {% elif value.exam_name is defined %}
-                                    {{ value.exam_name }}
-                                {% else %}
-                                    {{ value }}
-                                {% endif %}
-                            {% elif column == 'gender' %}
-                                {% if value == 'Male' %}
-                                    <span class="badge bg-info">Nam</span>
-                                {% elif value == 'Female' %}
-                                    <span class="badge bg-warning">Nữ</span>
-                                {% else %}
-                                    {{ value }}
-                                {% endif %}
-                            {% elif column == 'is_correct' %}
-                                {% if value %}
-                                    <span class="badge bg-success">Đúng</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">Sai</span>
-                                {% endif %}
-                            {% elif column.endswith('At') or column.endswith('_at') or 'time' in column.lower() or 'date' in column.lower() %}
-                                {% if value and value != 'None' %}
-                                    {{ value.strftime('%d/%m/%Y %H:%M') if value.strftime is defined else value }}
-                                {% else %}
-                                    <span class="text-muted">Chưa có</span>
-                                {% endif %}
-                            {% elif column == 'score' %}
-                                {% set score_val = value|float if value is not none else 0 %}
-                                <span class="badge bg-{% if score_val >= 80 %}success{% elif score_val >= 65 %}warning{% else %}danger{% endif %}">
-                                    {{ score_val }}/100
-                                </span>
-                            {% elif column == 'duration' %}
-                                {{ value }} phút
-                            {% elif column == 'password' %}
-                                <span class="text-muted">••••••••</span>
-                            {% elif column == 'avatar' and value and 'http' in value|string %}
-                                <img src="{{ value }}" alt="Avatar" class="rounded-circle" width="50" height="50">
-                            {% elif value|string|length > 100 %}
-                                <div class="text-truncate" title="{{ value }}">{{ value|string|truncate(100) }}</div>
-                            {% else %}
-                                {{ value }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Related Data (if any) -->
+        {% if model.__class__.__name__ == 'User' %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-diagram-3 me-2"></i>Dữ liệu liên quan
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% if model.exams %}
+                    <div class="col-md-6">
+                        <h6>Đề thi đã tạo ({{ model.exams|length }})</h6>
+                        <div class="list-group list-group-flush">
+                            {% for exam in model.exams[:5] %}
+                            <div class="list-group-item px-0">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-file-text me-2 text-primary"></i>
+                                    <strong>{{ exam.exam_name }}</strong>
+                                </div>
+                                <small class="text-muted">{{ exam.createAt.strftime('%d/%m/%Y') }}</small>
+                            </div>
+                            {% endfor %}
+                            {% if model.exams|length > 5 %}
+                            <div class="list-group-item px-0 text-muted">
+                                và {{ model.exams|length - 5 }} đề thi khác...
+                            </div>
                             {% endif %}
                         </div>
                     </div>
                     {% endif %}
-                {% endfor %}
-            </div>
-        </div>
-    </div>
 
-    <!-- Metadata Section -->
-    {% if model.createAt is defined or model.updateAt is defined or model.createBy is defined %}
-    <div class="detail-section mb-3">
-        <h6><i class="bi bi-clock me-2"></i>Thông tin metadata</h6>
-        <div class="row">
-            {% if model.createBy is defined %}
-            <div class="col-md-4">
-                <small class="text-muted">Tạo bởi:</small>
-                <strong>{{ model.createBy }}</strong>
-            </div>
-            {% endif %}
-            {% if model.createAt is defined %}
-            <div class="col-md-4">
-                <small class="text-muted">Ngày tạo:</small>
-                <strong>{{ model.createAt }}</strong>
-            </div>
-            {% endif %}
-            {% if model.updateAt is defined %}
-            <div class="col-md-4">
-                <small class="text-muted">Cập nhật cuối:</small>
-                <strong>{{ model.updateAt }}</strong>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Related Records -->
-    {% if model.__class__.__name__ == 'User' %}
-        {% if model.student is defined and model.student %}
-        <div class="card mb-4">
-            <div class="card-header bg-light">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-person me-2"></i>Thông tin học sinh
-                </h5>
-            </div>
-            <div class="card-body">
-                <p><strong>ID học sinh:</strong> {{ model.student.id }}</p>
-                {% if model.student.exam_results is defined and model.student.exam_results %}
-                <p><strong>Số bài thi đã làm:</strong> {{ model.student.exam_results|length }}</p>
-                <p><strong>Điểm trung bình:</strong>
-                    {% set avg_score = model.student.exam_results|map(attribute='score')|list|sum / model.student.exam_results|length %}
-                    <span class="badge bg-{% if avg_score >= 80 %}success{% elif avg_score >= 65 %}warning{% else %}danger{% endif %}">
-                        {{ "%.1f"|format(avg_score) }}/100
-                    </span>
-                </p>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
-
-        {% if model.admin is defined and model.admin %}
-        <div class="card mb-4">
-            <div class="card-header bg-light">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-shield-check me-2"></i>Thông tin quản trị viên
-                </h5>
-            </div>
-            <div class="card-body">
-                <p><strong>ID admin:</strong> {{ model.admin.id }}</p>
-                {% if model.admin.subjects is defined and model.admin.subjects %}
-                <p><strong>Số môn học quản lý:</strong> {{ model.admin.subjects|length }}</p>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
-    {% endif %}
-
-    {% if model.__class__.__name__ == 'Exam' and model.exam_results is defined and model.exam_results %}
-    <div class="card mb-4">
-        <div class="card-header bg-light">
-            <h5 class="card-title mb-0">
-                <i class="bi bi-bar-chart me-2"></i>Thống kê kết quả thi
-            </h5>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-3">
-                    <strong>Số lượt thi:</strong> {{ model.exam_results|length }}
-                </div>
-                <div class="col-md-3">
-                    <strong>Điểm cao nhất:</strong>
-                    <span class="badge bg-success">{{ model.exam_results|map(attribute='score')|list|max }}/100</span>
-                </div>
-                <div class="col-md-3">
-                    <strong>Điểm thấp nhất:</strong>
-                    <span class="badge bg-danger">{{ model.exam_results|map(attribute='score')|list|min }}/100</span>
-                </div>
-                <div class="col-md-3">
-                    <strong>Điểm trung bình:</strong>
-                    {% set avg = model.exam_results|map(attribute='score')|list|sum / model.exam_results|length %}
-                    <span class="badge bg-{% if avg >= 80 %}success{% elif avg >= 65 %}warning{% else %}danger{% endif %}">
-                        {{ "%.1f"|format(avg) }}/100
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    {% if model.__class__.__name__ == 'Question' and model.answers is defined and model.answers %}
-    <div class="card mb-4">
-        <div class="card-header bg-light">
-            <h5 class="card-title mb-0">
-                <i class="bi bi-list-check me-2"></i>Các đáp án ({{ model.answers|length }})
-            </h5>
-        </div>
-        <div class="card-body">
-            {% for answer in model.answers %}
-            <div class="relationship-item">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <strong>{{ loop.index }}. {{ answer.answer_text }}</strong>
-                        {% if answer.is_correct %}
-                        <span class="badge bg-success ms-2">Đáp án đúng</span>
-                        {% endif %}
-                        {% if answer.explanation is defined and answer.explanation %}
-                        <div class="text-muted small mt-1">{{ answer.explanation }}</div>
-                        {% endif %}
+                    {% if model.comments %}
+                    <div class="col-md-6">
+                        <h6>Bình luận ({{ model.comments|length }})</h6>
+                        <div class="list-group list-group-flush">
+                            {% for comment in model.comments[:5] %}
+                            <div class="list-group-item px-0">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-chat me-2 text-info"></i>
+                                    <span>{{ comment.content|truncate(50) }}</span>
+                                </div>
+                                <small class="text-muted">{{ comment.created_at.strftime('%d/%m/%Y') }}</small>
+                            </div>
+                            {% endfor %}
+                            {% if model.comments|length > 5 %}
+                            <div class="list-group-item px-0 text-muted">
+                                và {{ model.comments|length - 5 }} bình luận khác...
+                            </div>
+                            {% endif %}
+                        </div>
                     </div>
-                    <small class="text-muted">ID: {{ answer.id }}</small>
+                    {% endif %}
                 </div>
             </div>
-            {% endfor %}
         </div>
+        {% endif %}
     </div>
-    {% endif %}
 
-    {% else %}
-    <div class="card">
-        <div class="card-body text-center py-5">
-            <i class="bi bi-exclamation-triangle display-1 text-warning mb-4"></i>
-            <h4>Không tìm thấy bản ghi</h4>
-            <p class="text-muted">Bản ghi bạn đang tìm không tồn tại hoặc đã bị xóa.</p>
-            <a href="{{ return_url }}" class="btn btn-primary">
-                <i class="bi bi-arrow-left me-2"></i>Quay lại danh sách
-            </a>
+    <div class="col-lg-4">
+        <!-- Quick Stats -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-bar-chart me-2"></i>Thống kê nhanh
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if model.__class__.__name__ == 'Exam' %}
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="border-end pe-3">
+                            <div class="h4 mb-1 text-primary">{{ model.exam_results|length }}</div>
+                            <small class="text-muted">Lượt thi</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="ps-3">
+                            <div class="h4 mb-1 text-success">
+                                {% if model.exam_results %}
+                                    {{ "%.1f"|format(model.exam_results|map(attribute='score')|sum / model.exam_results|length) }}
+                                {% else %}
+                                    0
+                                {% endif %}
+                            </div>
+                            <small class="text-muted">Điểm TB</small>
+                        </div>
+                    </div>
+                </div>
+                {% elif model.__class__.__name__ == 'User' %}
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="border-end pe-3">
+                            <div class="h4 mb-1 text-primary">{{ model.exams|length }}</div>
+                            <small class="text-muted">Đề thi</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="ps-3">
+                            <div class="h4 mb-1 text-info">{{ model.questions|length }}</div>
+                            <small class="text-muted">Câu hỏi</small>
+                        </div>
+                    </div>
+                </div>
+                {% elif model.__class__.__name__ == 'Question' %}
+                <div class="row text-center">
+                    <div class="col-12">
+                        <div class="h4 mb-1 text-warning">{{ model.answers|length }}</div>
+                        <small class="text-muted">Đáp án</small>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Activity Timeline -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history me-2"></i>Hoạt động gần đây
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-marker bg-primary"></div>
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Được tạo</h6>
+                            <p class="text-muted mb-0">
+                                {% if model.createAt is defined %}
+                                    {{ model.createAt.strftime('%d/%m/%Y lúc %H:%M') }}
+                                {% elif model.createdAt is defined %}
+                                    {{ model.createdAt.strftime('%d/%m/%Y lúc %H:%M') }}
+                                {% elif model.created_at is defined %}
+                                    {{ model.created_at.strftime('%d/%m/%Y lúc %H:%M') }}
+                                {% else %}
+                                    Không có thông tin
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+
+                    {% if model.updateAt is defined or model.updated_at is defined %}
+                    <div class="timeline-item">
+                        <div class="timeline-marker bg-success"></div>
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Cập nhật lần cuối</h6>
+                            <p class="text-muted mb-0">
+                                {% if model.updateAt is defined %}
+                                    {{ model.updateAt.strftime('%d/%m/%Y lúc %H:%M') }}
+                                {% elif model.updated_at is defined %}
+                                    {{ model.updated_at.strftime('%d/%m/%Y lúc %H:%M') }}
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if model.__class__.__name__ == 'ExamResult' %}
+                    <div class="timeline-item">
+                        <div class="timeline-marker bg-info"></div>
+                        <div class="timeline-content">
+                            <h6 class="mb-1">Thời gian làm bài</h6>
+                            <p class="text-muted mb-0">{{ model.taken_exam.strftime('%d/%m/%Y lúc %H:%M') }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
-    {% endif %}
 </div>
 
-<script>
-// Enhanced details view functionality
-document.addEventListener('DOMContentLoaded', function() {
-    // Truncated text expansion
-    document.querySelectorAll('.text-truncate').forEach(function(element) {
-        element.style.cursor = 'pointer';
-        element.title = 'Click để xem đầy đủ';
-        element.addEventListener('click', function() {
-            if (this.classList.contains('text-truncate')) {
-                this.classList.remove('text-truncate');
-                this.title = 'Click để thu gọn';
-            } else {
-                this.classList.add('text-truncate');
-                this.title = 'Click để xem đầy đủ';
-            }
-        });
-    });
-
-    // Image modal for avatars
-    document.querySelectorAll('img[src]').forEach(function(img) {
-        img.style.cursor = 'pointer';
-        img.addEventListener('click', function() {
-            const modal = document.createElement('div');
-            modal.className = 'modal fade';
-            modal.innerHTML = `
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">Hình ảnh</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body text-center">
-                            <img src="${this.src}" class="img-fluid" alt="Full size image">
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-            const bsModal = new bootstrap.Modal(modal);
-            bsModal.show();
-            modal.addEventListener('hidden.bs.modal', function() {
-                document.body.removeChild(modal);
-            });
-        });
-    });
-
-    // Copy ID to clipboard
-    document.querySelectorAll('.form-control-plaintext').forEach(function(element) {
-        if (element.closest('.col-md-2') && element.textContent.match(/^\d+$/)) {
-            element.style.cursor = 'pointer';
-            element.title = 'Click để copy ID';
-            element.addEventListener('click', function() {
-                navigator.clipboard.writeText(this.textContent).then(function() {
-                    // Show toast notification
-                    showToast('Đã copy ID: ' + element.textContent);
-                });
-            });
-        }
-    });
-
-    function showToast(message) {
-        const toast = document.createElement('div');
-        toast.className = 'toast align-items-center text-white bg-success border-0 position-fixed';
-        toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999;';
-        toast.innerHTML = `
-            <div class="d-flex">
-                <div class="toast-body">${message}</div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+<!-- Delete Modal -->
+{% if admin_view.can_delete %}
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Xác nhận xóa
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-        `;
-        document.body.appendChild(toast);
-        const bsToast = new bootstrap.Toast(toast);
-        bsToast.show();
-        toast.addEventListener('hidden.bs.toast', function() {
-            document.body.removeChild(toast);
-        });
-    }
-});
-</script>
+            <div class="modal-body">
+                <p class="mb-3">Bạn có chắc chắn muốn xóa {{ admin_view.name|lower }} này không?</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Cảnh báo:</strong> Hành động này không thể hoàn tác!
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <form method="POST" action="{{ url_for('.delete_view') }}" class="d-inline">
+                    <input type="hidden" name="id" value="{{ model.id }}">
+                    <input type="hidden" name="url" value="{{ return_url }}">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash me-2"></i>Xóa
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

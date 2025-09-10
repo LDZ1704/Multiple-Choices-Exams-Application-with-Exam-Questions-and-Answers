@@ -1,0 +1,237 @@
+{% extends 'layout/base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="page-header">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-8 mx-auto">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h1 class="page-title">
+                                <i class="bi bi-bell"></i>
+                                Thông báo
+                            </h1>
+                            <p class="page-subtitle">Cập nhật các thông báo mới nhất từ hệ thống</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 mx-auto">
+                <div class="filter-buttons">
+                    {% if not unread_only %}
+                    <a href="{{ url_for('notifications') }}" class="btn btn-outline-primary filter-btn active">
+                        <i class="bi bi-list"></i> Tất cả
+                    </a>
+                    <a href="{{ url_for('notifications', unread=True) }}" class="btn btn-outline-primary filter-btn">
+                        <i class="bi bi-eye"></i> Chưa đọc
+                    </a>
+                    {% else %}
+                    <a href="{{ url_for('notifications') }}" class="btn btn-outline-primary filter-btn">
+                        <i class="bi bi-list"></i> Tất cả
+                    </a>
+                    <a href="{{ url_for('notifications', unread=True) }}" class="btn btn-outline-primary filter-btn active">
+                        <i class="bi bi-eye"></i> Chưa đọc
+                    </a>
+                    {% endif %}
+
+                    <button class="btn btn-success filter-btn" onclick="markAllAsRead()">
+                        <i class="bi bi-check-all"></i> Đánh dấu tất cả đã đọc
+                    </button>
+                </div>
+
+                {% if notifications %}
+                <div class="notifications-list">
+                    {% for notification in notifications %}
+                    <div class="notification-card {{ 'unread' if not notification.is_read else '' }}"
+                         data-id="{{ notification.id }}">
+                        <div class="notification-card-body">
+                            <div class="notification-header">
+                                <div class="notification-main">
+                                    <div class="notification-card-icon {{ notification.notification_type }}">
+                                        {% if notification.notification_type == 'result' %}
+                                        <i class="bi bi-trophy"></i>
+                                        {% elif notification.notification_type == 'reminder' %}
+                                        <i class="bi bi-clock"></i>
+                                        {% elif notification.notification_type == 'suggestion' %}
+                                        <i class="bi bi-lightbulb"></i>
+                                        {% elif notification.notification_type == 'new_exam' %}
+                                        <i class="bi bi-file-earmark-plus"></i>
+                                        {% else %}
+                                        <i class="bi bi-info-circle"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div class="notification-card-content">
+                                        <h6 class="notification-card-title">
+                                            {% if not notification.is_read %}
+                                            <span class="notification-new-badge me-2">
+                                                <i class="bi bi-dot"></i> Mới
+                                            </span>
+                                            {% endif %}
+                                            {{ notification.title }}
+                                        </h6>
+                                        <p class="notification-card-message">{{ notification.message }}</p>
+                                        <div class="notification-card-meta">
+                                            <span>
+                                                <i class="bi bi-calendar3"></i>
+                                                {{ notification.created_at.strftime('%d/%m/%Y lúc %H:%M') }}
+                                            </span>
+                                            <span>
+                                                <i class="bi bi-tag"></i>
+                                                {% if notification.notification_type == 'result' %}
+                                                Kết quả thi
+                                                {% elif notification.notification_type == 'reminder' %}
+                                                Nhắc nhở
+                                                {% elif notification.notification_type == 'suggestion' %}
+                                                Gợi ý
+                                                {% elif notification.notification_type == 'new_exam' %}
+                                                Bài thi mới
+                                                {% else %}
+                                                Thông tin
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="notification-actions">
+                                    <div class="dropdown">
+                                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            {% if not notification.is_read %}
+                                            <li>
+                                                <button class="dropdown-item" onclick="markAsRead({{ notification.id }})">
+                                                    <i class="bi bi-check"></i> Đánh dấu đã đọc
+                                                </button>
+                                            </li>
+                                            {% endif %}
+                                            {% if notification.exam_id %}
+                                            <li>
+                                                <a class="dropdown-item" href="{{ url_for('exam_detail', id=notification.exam_id) }}">
+                                                    <i class="bi bi-eye"></i> Xem đề thi
+                                                </a>
+                                            </li>
+                                            {% endif %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Phân trang -->
+                {% if pagination.pages > 1 %}
+                <nav aria-label="Phân trang thông báo" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if pagination.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('notifications', page=pagination.prev_num, unread=unread_only) }}">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        {% for page_num in pagination.iter_pages() %}
+                        {% if page_num %}
+                        {% if page_num != pagination.page %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('notifications', page=page_num, unread=unread_only) }}">{{ page_num }}</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_num }}</span>
+                        </li>
+                        {% endif %}
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+
+                        {% if pagination.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('notifications', page=pagination.next_num, unread=unread_only) }}">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+                {% else %}
+                <div class="empty-notifications">
+                    <i class="bi bi-bell-slash display-1"></i>
+                    <h5 class="mt-3">
+                        {% if unread_only %}
+                        Không có thông báo chưa đọc
+                        {% else %}
+                        Chưa có thông báo nào
+                        {% endif %}
+                    </h5>
+                    <p class="text-muted">
+                        {% if unread_only %}
+                        Tất cả thông báo đã được đọc
+                        {% else %}
+                        Các thông báo sẽ hiển thị tại đây
+                        {% endif %}
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function markAsRead(notificationId) {
+    fetch(`/api/notifications/mark-read/${notificationId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Error marking notification as read:', error);
+    });
+}
+
+function markAllAsRead() {
+    fetch('/api/notifications/mark-all-read', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Error marking all notifications as read:', error);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.notification-card');
+    cards.forEach((card, index) => {
+        card.style.animationDelay = `${index * 0.1}s`;
+    });
+});
+</script>
+{% endblock %}

@@ -1,25 +1,98 @@
 import re
 import os
-from sqlalchemy import or_
-from flask import Flask, render_template, url_for, request, redirect, session, flash, jsonify
-from flask_login import login_user, current_user, logout_user, login_required
-from app import app, db, login_manager, utils
-from app.models import User, Role, Student, ExamResult, Subject
+from sqlalchemy import func
+from flask import session, jsonify
+from flask_login import login_user, login_required
+from app import login_manager, utils
+from app.models import ExamSession, Notification
 from app.models import Admin as AdminModels
 import app.dao as dao
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime, timedelta
 from app.admin import *
 import qrcode
 from io import BytesIO
 import base64
+from app.notification_scheduler import init_notification_scheduler
+from app.recommendation_engine import recommendation_engine
+from app.smart_chatbot import smart_chatbot
+from celery_tasks import generate_daily_recommendations
+from celery_tasks import generate_personalized_study_plan
+from celery.result import AsyncResult
+from notification_service import NotificationService
+import io
+import csv
+from flask import make_response
+from websocket_client import ws_client
 
 
 @app.context_processor
 def inject_user():
     return dict(current_user=current_user, admin=admin, dao=dao)
+
+
+@app.context_processor
+def inject_notifications():
+    if current_user.is_authenticated:
+        unread_count = NotificationService.get_unread_count(current_user.id)
+        return dict(unread_notifications_count=unread_count)
+    return dict(unread_notifications_count=0)
+
+
+@app.route('/notifications')
+@login_required
+def notifications():
+    page = request.args.get('page', 1, type=int)
+    unread_only = request.args.get('unread', False, type=bool)
+
+    notifications_pagination = NotificationService.get_user_notifications(current_user.id, page=page, per_page=10, unread_only=unread_only)
+
+    return render_template('notifications.html',
+                           notifications=notifications_pagination.items,
+                           pagination=notifications_pagination,
+                           unread_only=unread_only)
+
+
+@app.route('/api/notifications/unread-count')
+@login_required
+def get_unread_notifications_count():
+    count = NotificationService.get_unread_count(current_user.id)
+    return jsonify({'count': count})
+
+
+@app.route('/api/notifications/mark-read/<int:notification_id>', methods=['POST'])
+@login_required
+def mark_notification_read(notification_id):
+    success = NotificationService.mark_as_read(notification_id, current_user.id)
+    return jsonify({'success': success})
+
+
+@app.route('/api/notifications/mark-all-read', methods=['POST'])
+@login_required
+def mark_all_notifications_read():
+    NotificationService.mark_all_as_read(current_user.id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/notifications/recent')
+@login_required
+def get_recent_notifications():
+    notifications = NotificationService.get_user_notifications(current_user.id, per_page=5).items
+
+    data = []
+    for n in notifications:
+        data.append({
+            'id': n.id,
+            'title': n.title,
+            'message': n.message,
+            'type': n.notification_type,
+            'is_read': n.is_read,
+            'created_at': n.created_at.strftime('%d/%m/%Y %H:%M'),
+            'exam_id': n.exam_id
+        })
+
+    return jsonify({'notifications': data})
 
 
 @app.route('/')
@@ -66,6 +139,7 @@ def login():
         username = request.form['username']
         password = request.form['password']
         next_page = request.args.get('next')
+        user_id = current_user.id if current_user.is_authenticated else None
 
         user = dao.auth_user(username, password)
 
@@ -80,8 +154,9 @@ def login():
             elif user.role == Role.STUDENT:
                 if not dao.existence_check(Student, 'user_id', user.id):
                     dao.add_student(user)
+                if next_page == '/login':
+                    return redirect('/')
                 return redirect(next_page) if next_page else redirect('/')
-
         else:
             flash('Thông tin tài khoản và mật khẩu không chính xác!', 'danger')
 
@@ -96,7 +171,16 @@ def load_user(user_id):
 @app.route('/logout')
 @login_required
 def logout():
+    user_id = current_user.id if current_user.is_authenticated else None
     logout_user()
+
+    if user_id:
+        if ws_client.connected:
+            ws_client.send_event({
+                'type': 'user_logout',
+                'user_id': user_id
+            })
+    flash('Đã đăng xuất thành công.', 'success')
     return redirect('/')
 
 
@@ -191,14 +275,31 @@ def exam_detail():
     user_results = None
     highest_score = 0
     has_result = False
+    user_rating = None
+
     if current_user.is_authenticated:
         user_results = utils.get_user_exam_results(current_user.id, exam_id)
         highest_score = utils.get_highest_score(current_user.id, exam_id)
         student = dao.get_student_by_user_id(current_user.id)
         if student:
             has_result = dao.has_exam_result(student.id, exam_id)
+            user_rating = dao.get_user_rating(current_user.id, exam_id)
 
-    return render_template('examdetail.html', exam=exam, stats=stats, question_count=question_count, comments_pagination=comments_pagination, user_results=user_results, session=session_obj, highest_score=highest_score, has_result=has_result, ranking_pagination=ranking_pagination, ranking_stats=ranking_stats)
+    rating_stats = dao.get_exam_rating_stats(exam_id)
+
+    return render_template('examdetail.html',
+                           exam=exam,
+                           stats=stats,
+                           question_count=question_count,
+                           comments_pagination=comments_pagination,
+                           user_results=user_results,
+                           session=session_obj,
+                           highest_score=highest_score,
+                           has_result=has_result,
+                           ranking_pagination=ranking_pagination,
+                           ranking_stats=ranking_stats,
+                           rating_stats=rating_stats,
+                           user_rating=user_rating)
 
 
 @app.route('/api/exam/<int:exam_id>/qr-code')
@@ -249,6 +350,74 @@ def add_exam_comment():
         flash('Có lỗi xảy ra khi gửi đánh giá!', 'error')
 
     return redirect(url_for('exam_detail', id=exam_id))
+
+
+@app.route('/api/exam/<int:exam_id>/rating', methods=['POST'])
+@login_required
+def rate_exam(exam_id):
+    try:
+        data = request.get_json()
+        rating_value = data.get('rating')
+        if not rating_value or rating_value not in [1, 2, 3, 4, 5]:
+            return jsonify({'error': 'Đánh giá phải từ 1 đến 5 sao'}), 400
+
+        exam = dao.get_exam_by_id(exam_id)
+        if not exam:
+            return jsonify({'error': 'Đề thi không tồn tại'}), 404
+
+        student = dao.get_student_by_user_id(current_user.id)
+        if not student:
+            return jsonify({'error': 'Không tìm thấy thông tin học sinh'}), 404
+
+        has_result = dao.has_exam_result(student.id, exam_id)
+        if not has_result:
+            return jsonify({'error': 'Bạn phải làm bài thi trước khi đánh giá'}), 400
+
+        success = dao.add_or_update_rating(current_user.id, exam_id, rating_value)
+        if success:
+            stats = dao.get_exam_rating_stats(exam_id)
+            return jsonify({
+                'success': True,
+                'message': 'Đánh giá thành công!',
+                'stats': stats
+            })
+        else:
+            return jsonify({'error': 'Có lỗi xảy ra khi đánh giá'}), 500
+    except Exception as e:
+        print(f"Error in rate_exam: {e}")
+        return jsonify({'error': 'Có lỗi xảy ra'}), 500
+
+
+@app.route('/api/exam/<int:exam_id>/rating-stats')
+def get_exam_rating_stats(exam_id):
+    try:
+        stats = dao.get_exam_rating_stats(exam_id)
+
+        user_rating = None
+        if current_user.is_authenticated:
+            user_rating = dao.get_user_rating(current_user.id, exam_id)
+
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'user_rating': user_rating
+        })
+    except Exception as e:
+        print(f"Error getting rating stats: {e}")
+        return jsonify({'error': 'Có lỗi xảy ra'}), 500
+
+
+@app.route('/api/user/<int:user_id>/exam/<int:exam_id>/rating')
+def get_user_exam_rating(user_id, exam_id):
+    try:
+        rating = dao.get_user_rating(user_id, exam_id)
+        return jsonify({
+            'success': True,
+            'rating': rating
+        })
+    except Exception as e:
+        print(f"Error getting user rating: {e}")
+        return jsonify({'success': False, 'rating': None})
 
 
 @app.route('/account', methods=['GET'])
@@ -548,6 +717,11 @@ def doing_exam(exam_id):
         flash('Không tìm thấy thông tin học sinh!', 'error')
         return redirect(url_for('index'))
 
+    can_take, attempts = dao.check_exam_attempts_limit(student.id, exam_id)
+    if not can_take:
+        flash(f'Bạn đã thi quá {attempts} lần trong 24 giờ qua. Vui lòng thử lại sau.', 'error')
+        return redirect(url_for('exam_detail', id=exam_id))
+
     is_creator = (current_user.id == exam.user_id)
 
     if is_creator and not request.args.get('confirmed'):
@@ -576,6 +750,15 @@ def doing_exam(exam_id):
         flash('Thời gian làm bài đã hết!', 'warning')
         return redirect(url_for('index'))
 
+    # Gửi event WebSocket
+    if current_user.is_authenticated and hasattr(current_user, 'student'):
+        if ws_client.connected:
+            ws_client.send_event({
+                'type': 'join_exam',
+                'exam_id': exam_id,
+                'student_id': current_user.student.id
+            })
+
     return render_template('doing-exam.html',
                            exam=exam,
                            remaining_time=remaining_time,
@@ -583,7 +766,8 @@ def doing_exam(exam_id):
                            session_data={
                                'current_question_index': session_obj.current_question_index,
                                'user_answers': session_obj.user_answers or {},
-                               'is_paused': session_obj.is_paused
+                               'is_paused': session_obj.is_paused,
+                               'isolations_count': session_obj.isolations_count or 0
                            })
 
 
@@ -724,6 +908,65 @@ def restart_exam(exam_id):
         return jsonify({'error': 'Có lỗi xảy ra khi reset bài thi'}), 500
 
 
+@app.route('/api/exam/<int:exam_id>/log-violation', methods=['POST'])
+@login_required
+def log_exam_violation(exam_id):
+    try:
+        data = request.get_json()
+        violation_type = data.get('type')
+        details = data.get('details', {})
+
+        student = dao.get_student_by_user_id(current_user.id)
+        if not student:
+            return jsonify({'error': 'Không tìm thấy học sinh!'}), 404
+
+        dao.log_suspicious_activity(student.id, exam_id, violation_type, details)
+
+        session_obj = dao.get_exam_session(student.id, exam_id)
+        if not session_obj:
+            return jsonify({'success': False, 'error': 'Session not found'}), 404
+
+        session_obj.isolations_count = (session_obj.isolations_count or 0) + 1
+
+        if session_obj.isolations_count >= 2:
+            session_obj.is_terminated = True
+            session_obj.is_completed = True
+            db.session.commit()
+            return jsonify({
+                'terminated': True,
+                'message': 'Bài thi đã bị kết thúc do vi phạm quá nhiều lần',
+                'isolations_count': session_obj.isolations_count
+            })
+
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'terminated': False,
+            'isolations_count': session_obj.isolations_count
+        })
+
+    except Exception as e:
+        print(f"Error in log_violation: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/exam/<int:exam_id>/check-violations')
+@login_required
+def check_violations(exam_id):
+    student = dao.get_student_by_user_id(current_user.id)
+    if not student:
+        return jsonify({'error': 'Không tìm thấy học sinh!'}), 404
+
+    session_obj = dao.get_exam_session(student.id, exam_id)
+    if not session_obj:
+        return jsonify({'isolations_count': 0, 'is_terminated': False})
+
+    return jsonify({
+        'isolations_count': session_obj.isolations_count or 0,
+        'is_terminated': session_obj.is_terminated or False
+    })
+
+
 @app.route('/api/exam/submit', methods=['POST'])
 @login_required
 def submit_exam():
@@ -743,10 +986,12 @@ def submit_exam():
     if not student:
         return jsonify({'error': 'Không tìm thấy thông tin học sinh'}), 404
 
+    session_obj = dao.get_exam_session(student.id, exam_id)
+    if not session_obj or session_obj.is_completed:
+        return jsonify({'error': 'Session không hợp lệ hoặc đã hoàn thành'}), 400
+
     is_creator = (current_user.id == exam.user_id)
-
     remaining_time = dao.get_remaining_time_with_session(student.id, exam_id, exam.duration)
-
     if remaining_time <= 0:
         actual_time_taken = exam.duration * 60
     else:
@@ -755,10 +1000,20 @@ def submit_exam():
     score = utils.calculate_exam_score(exam_id, answers)
     result_id = utils.save_exam_result(student.id, exam_id, score, answers, actual_time_taken)
 
+    # Gửi event WebSocket
+    if current_user.is_authenticated and hasattr(current_user, 'student'):
+        if ws_client.connected:
+            ws_client.send_event({
+                'type': 'submit_exam',
+                'exam_id': exam_id,
+                'student_id': current_user.student.id,
+                'score': score
+            })
+
     if result_id:
-        session_obj = dao.get_exam_session(student.id, exam_id)
-        if session_obj:
-            utils.complete_exam_session(session_obj)
+        utils.complete_exam_session(session_obj)
+        NotificationService.send_exam_result_notification(student.id, exam_id, score)
+        NotificationService.send_improvement_suggestion(student.id)
         success_message = ('Bài thi đã được chấm điểm! (Kết quả không tham gia xếp hạng vì bạn là người tạo đề)' if is_creator else 'Bài thi đã được chấm điểm thành công!')
 
         return jsonify({
@@ -771,6 +1026,15 @@ def submit_exam():
         })
     else:
         return jsonify({'error': 'Lỗi khi lưu kết quả'}), 500
+
+
+@app.route('/api/get-current-student-id')
+@login_required
+def get_current_student_id():
+    student = dao.get_student_by_user_id(current_user.id)
+    if student:
+        return jsonify({'student_id': student.id})
+    return jsonify({'error': 'Student not found'}), 404
 
 
 @app.route('/exam-result/<int:result_id>')
@@ -788,6 +1052,83 @@ def view_exam_result(result_id):
         return redirect(url_for('index'))
 
     return render_template('exam-result.html', result=result_data['result'], questions_with_answers=result_data['questions_with_answers'])
+
+
+@app.route('/api/exam-result/charts/<int:result_id>')
+@login_required
+def get_exam_result_charts(result_id):
+    try:
+        result = dao.get_exam_result_by_id(result_id)
+        if not result:
+            return jsonify({'error': 'Không tìm thấy kết quả!'}), 404
+
+        current_student = dao.get_student_by_user_id(current_user.id)
+        if not current_student or current_student.id != result.student_id:
+            return jsonify({'error': 'Không có quyền truy cập!'}), 403
+
+        try:
+            previous_results = dao.get_student_exam_results_by_exam(current_student.id, result.exam_id)
+        except:
+            previous_results = [result]
+
+        comparison_labels = []
+        comparison_scores = []
+        for i, prev_result in enumerate(previous_results[-5:], 1):
+            comparison_labels.append(f'Lần {i}')
+            comparison_scores.append(prev_result.score)
+
+        try:
+            questions_analysis = dao.get_exam_result_questions_analysis(result_id)
+            correct_count = sum(1 for q in questions_analysis if q.get('is_correct', False))
+            incorrect_count = len(questions_analysis) - correct_count
+        except Exception as e:
+            print(f"Error in questions analysis: {e}")
+            if result.user_answers:
+                questions = dao.get_exam_questions_with_answers(result.exam_id)
+                correct_count = 0
+                for question in questions:
+                    user_answer_id = result.user_answers.get(str(question['id']))
+                    if user_answer_id:
+                        correct_answer = next((a for a in question['answers'] if a['is_correct']), None)
+                        if correct_answer and int(user_answer_id) == correct_answer['id']:
+                            correct_count += 1
+                incorrect_count = len(questions) - correct_count
+            else:
+                correct_count = 0
+                incorrect_count = 1
+
+        time_efficiency = 100
+        if result.time_taken and result.exam.duration:
+            time_efficiency = min(100, (result.exam.duration * 60 - result.time_taken) / (result.exam.duration * 60) * 100)
+
+        accuracy = (correct_count / (correct_count + incorrect_count) * 100) if (correct_count + incorrect_count) > 0 else 0
+
+        overall_efficiency = 100
+        if result.time_taken and result.time_taken > 0 and result.exam.duration:
+            time_ratio = result.time_taken / (result.exam.duration * 60)
+            overall_efficiency = min(100, result.score / time_ratio) if time_ratio > 0 else 100
+        return jsonify({
+            'score_comparison': {
+                'labels': comparison_labels,
+                'data': comparison_scores
+            },
+            'question_analysis': {
+                'labels': ['Đúng', 'Sai'],
+                'data': [correct_count, incorrect_count]
+            },
+            'performance_radar': {
+                'labels': ['Điểm số', 'Thời gian', 'Độ chính xác', 'Hiệu quả'],
+                'data': [
+                    result.score,
+                    time_efficiency,
+                    accuracy,
+                    min(100, overall_efficiency)
+                ]
+            }
+        })
+    except Exception as e:
+        print(f"Error in get_exam_result_charts: {e}")
+        return jsonify({'error': f'Lỗi server: {str(e)}'}), 500
 
 
 @app.route('/exam-history')
@@ -815,6 +1156,92 @@ def exam_history():
     subjects = dao.get_all_subjects()
 
     return render_template('exam-history.html', exam_results=pagination.items, pagination=pagination, search_query=search_query, selected_subject=selected_subject, score_filter=score_filter, subjects=subjects)
+
+
+@app.route('/api/exam-history/charts/<int:user_id>')
+@login_required
+def get_exam_history_charts(user_id):
+    if current_user.id != user_id:
+        return jsonify({'error': 'Không có quyền truy cập!'}), 403
+
+    current_student = dao.get_student_by_user_id(user_id)
+    if not current_student:
+        return jsonify({'error': 'Không tìm thấy thông tin học sinh!'}), 404
+
+    results = dao.get_student_exam_results(current_student.id)
+    if not results:
+        return jsonify({
+            'score_trend': {'labels': [], 'data': []},
+            'subject_performance': {'labels': [], 'data': []},
+            'score_distribution': {'labels': [], 'data': []},
+            'monthly_stats': {'labels': [], 'data': []},
+            'time_performance': {'labels': [], 'efficiency': [], 'scores': []}
+        })
+
+    score_trend_labels = []
+    score_trend_data = []
+    for result in results[-20:]:
+        score_trend_labels.append(result.taken_exam.strftime('%d/%m'))
+        score_trend_data.append(result.score)
+
+    subject_scores = {}
+    for result in results:
+        subject_name = result.exam.subject.subject_name
+        if subject_name not in subject_scores:
+            subject_scores[subject_name] = []
+        subject_scores[subject_name].append(result.score)
+
+    subject_labels = list(subject_scores.keys())
+    subject_avg_scores = [sum(scores) / len(scores) for scores in subject_scores.values()]
+    score_ranges = {
+        'Xuất sắc (≥80)': len([r for r in results if r.score >= 80]),
+        'Khá tốt (65-79)': len([r for r in results if 65 <= r.score < 80]),
+        'Đạt yêu cầu (50-64)': len([r for r in results if 50 <= r.score < 65]),
+        'Cần cố gắng (<50)': len([r for r in results if r.score < 50])
+    }
+
+    monthly_stats = {}
+    for result in results:
+        month_key = result.taken_exam.strftime('%m/%Y')
+        if month_key not in monthly_stats:
+            monthly_stats[month_key] = {'total': 0, 'sum_score': 0}
+        monthly_stats[month_key]['total'] += 1
+        monthly_stats[month_key]['sum_score'] += result.score
+
+    monthly_labels = list(monthly_stats.keys())[-12:]
+    monthly_avg_scores = [monthly_stats[month]['sum_score'] / monthly_stats[month]['total'] for month in monthly_labels]
+    time_labels = []
+    time_efficiency = []
+    time_scores = []
+    for result in results[-15:]:
+        if result.time_taken:
+            time_labels.append(result.exam.exam_name[:20] + '...' if len(result.exam.exam_name) > 20 else result.exam.exam_name)
+            time_ratio = result.time_taken / (result.exam.duration * 60)
+            time_efficiency.append(round(result.score / time_ratio, 1) if time_ratio > 0 else 0)
+            time_scores.append(result.score)
+    return jsonify({
+        'score_trend': {
+            'labels': score_trend_labels,
+            'data': score_trend_data
+        },
+        'subject_performance': {
+            'labels': subject_labels,
+            'data': subject_avg_scores
+        },
+        'score_distribution': {
+            'labels': list(score_ranges.keys()),
+            'data': list(score_ranges.values())
+        },
+        'monthly_stats': {
+            'labels': monthly_labels,
+            'data': monthly_avg_scores
+        },
+        'time_performance': {
+            'labels': time_labels,
+            'efficiency': time_efficiency,
+            'scores': time_scores
+        }
+    })
 
 
 @app.route('/user-exams')
@@ -1026,5 +1453,145 @@ def get_subject_questions_count(subject_id):
         }), 500
 
 
+@app.route('/recommendations')
+@login_required
+def recommendations():
+    student = dao.get_student_by_user_id(current_user.id)
+    if not student:
+        flash('Không tìm thấy thông tin học sinh!', 'error')
+        return redirect(url_for('index'))
+
+    analysis = recommendation_engine.analyze_student_performance(student.id)
+    recommendations = recommendation_engine.recommend_study_materials(student.id)
+    overall_ranking = recommendation_engine.get_student_ranking(student.id)
+    monthly_ranking = recommendation_engine.get_student_ranking(student.id, 'month')
+    subject_ranking = None
+    if analysis and analysis.get('worst_subject'):
+        subject_ranking = recommendation_engine.get_subject_ranking(student.id, analysis['worst_subject'])
+
+    leaderboard = recommendation_engine.get_leaderboard(limit=10)
+    badges = recommendation_engine.get_achievement_badges(student.id)
+    return render_template('recommendations.html',
+                           analysis=analysis,
+                           recommendations=recommendations,
+                           overall_ranking=overall_ranking,
+                           monthly_ranking=monthly_ranking,
+                           subject_ranking=subject_ranking,
+                           leaderboard=leaderboard,
+                           badges=badges)
+
+
+@app.route('/api/recommendations')
+@login_required
+def api_recommendations():
+    student = dao.get_student_by_user_id(current_user.id)
+    if not student:
+        return jsonify({'error': 'Không tìm thấy thông tin học sinh!'}), 404
+
+    recommendations = recommendation_engine.recommend_study_materials(student.id)
+    return jsonify({'recommendations': recommendations})
+
+
+@app.route('/api/student-ranking/<int:student_id>')
+@login_required
+def get_student_ranking(student_id):
+    student = dao.get_student_by_user_id(current_user.id)
+    if not student:
+        return jsonify({'error': 'Student not found'}), 404
+
+    timeframe = request.args.get('timeframe', 'all')
+    ranking = recommendation_engine.get_student_ranking(student_id, timeframe)
+    return jsonify(ranking)
+
+
+@app.route('/api/subject-ranking/<int:student_id>')
+@login_required
+def get_subject_ranking(student_id):
+    student = dao.get_student_by_user_id(current_user.id)
+    if not student:
+        return jsonify({'error': 'Student not found'}), 404
+
+    subject_name = request.args.get('subject')
+    ranking = recommendation_engine.get_subject_ranking(student_id, subject_name)
+    return jsonify(ranking)
+
+
+@app.route('/api/leaderboard')
+@login_required
+def get_leaderboard():
+    timeframe = request.args.get('timeframe', 'all')
+    subject_id = request.args.get('subject_id', type=int)
+    limit = request.args.get('limit', 20, type=int)
+
+    leaderboard = recommendation_engine.get_leaderboard(limit, timeframe, subject_id)
+    return jsonify({'leaderboard': leaderboard})
+
+
+@app.route('/api/achievement-badges/<int:student_id>')
+@login_required
+def get_achievement_badges(student_id):
+    student = dao.get_student_by_user_id(current_user.id)
+    if not student:
+        return jsonify({'error': 'Student not found'}), 404
+
+    badges = recommendation_engine.get_achievement_badges(student_id)
+    return jsonify({'badges': badges})
+
+
+@app.route('/chatbot')
+def chatbot_page():
+    return render_template('chatbot.html')
+
+
+@app.route('/api/chatbot', methods=['POST'])
+def chatbot_api():
+    try:
+        data = request.get_json()
+        message = data.get('message', '')
+        user_id = data.get('user_id')
+        if not message.strip():
+            return jsonify({'response': 'Bạn chưa nhập tin nhắn nào. Hãy thử hỏi tôi điều gì đó! 😊'})
+
+        response = smart_chatbot.process_message(message, user_id)
+        return jsonify({
+            'response': response,
+            'status': 'success'
+        })
+    except Exception as e:
+        print(f"Chatbot error: {e}")
+        return jsonify({
+            'response': 'Xin lỗi, tôi đang gặp sự cố. Bạn có thể thử lại sau không? 🤖💭',
+            'status': 'error'
+        }), 500
+
+
+@app.route('/api/study-plan/<int:student_id>')
+@login_required
+def get_study_plan(student_id):
+    if current_user.role not in [Role.ADMIN] and current_user.id != student_id:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    study_plan = generate_personalized_study_plan.delay(student_id)
+    return jsonify({'message': 'Kế hoạch học tập đã được tạo!', 'task_id': study_plan.id})
+
+
+@app.route('/api/study-plan-status/<task_id>')
+@login_required
+def check_study_plan_status(task_id):
+    try:
+        result = AsyncResult(task_id)
+        if result.ready():
+            return jsonify({
+                'status': 'completed',
+                'result': result.result
+            })
+        else:
+            return jsonify({'status': 'pending'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
+    init_notification_scheduler(app)
+    ws_client.start()
     app.run(debug=True)

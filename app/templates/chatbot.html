@@ -1,53 +1,44 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
-          integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/flash-message.css') }}">
-    <link rel="icon" type="image/jpg" href="{{ url_for('static', filename='images/logo.jpg') }}">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-    <title>Website thi trắc nghiệm trực tuyến</title>
-</head>
-<body>
-{% include 'layout/header.html' %}
+{% extends 'layout/base.html' %}
+
 {% block content %}
-{% endblock %}
+<div class="container py-5">
+    <div class="demo-content p-5">
+        <h1 class="text-center mb-4">🎓 LmaoQuiz - Hệ thống Thi Trực tuyến</h1>
+        <p class="lead text-center">Cuộn xuống để thấy chatbot widget luôn hiển thị ở góc phải màn hình</p>
 
-<button type="button" class="btn btn-success position-fixed bottom-0 end-0 m-3 rounded-circle" id="scrollToTop" style="display: none; width: 50px; height: 50px; z-index: 1000;">
-    <i class="bi bi-arrow-up"></i>
-</button>
-
-<!-- Flash Messages Container -->
-<div id="flashOverlay" class="flash-overlay" onclick="closeFlashMessages(event)">
-    <div class="flash-modal" onclick="event.stopPropagation()">
-        <button class="flash-close" onclick="closeFlashMessages()">&times;</button>
-        <div id="flashContainer">
-            <!-- Flash messages will be inserted here -->
+        <div class="row mt-5">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">📚 Đề thi đa dạng</h5>
+                        <p class="card-text">Hàng nghìn đề thi từ cơ bản đến nâng cao</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">🤖 AI Trợ lý thông minh</h5>
+                        <p class="card-text">Chatbot hỗ trợ học tập 24/7</p>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="flash-buttons">
-            <button class="flash-btn flash-btn-primary" onclick="closeFlashMessages()">Đóng</button>
+
+        <div class="mt-5">
+            <h3>Thử nghiệm Chatbot</h3>
+            <p>Nhấn vào nút chatbot ở góc phải để trải nghiệm tính năng AI trợ lý học tập!</p>
+            <ul>
+                <li>Tìm đề thi theo môn học</li>
+                <li>Phân tích kết quả học tập</li>
+                <li>Đề xuất tài liệu ôn tập</li>
+                <li>Giải đáp thắc mắc kiến thức</li>
+            </ul>
         </div>
     </div>
 </div>
-{% with messages = get_flashed_messages(with_categories=true) %}
-{% if messages %}
-<div id="flaskMessages" style="display: none;">
-    {% for category, message in messages %}
-    <div data-category="{{ category }}" data-message="{{ message }}"></div>
-    {% endfor %}
-</div>
-{% endif %}
-{% endwith %}
 
-{% if not request.endpoint or 'doing-exam' not in request.endpoint %}
-<!-- Chatbot Widget HTML -->
+<!-- Chatbot Widget -->
 <div class="chatbot-widget">
     <!-- Chat Window -->
     <div class="chat-window" id="chatWindow">
@@ -147,23 +138,7 @@
     <!-- Toggle Button -->
     <button class="chat-toggle-btn" id="chatToggle" onclick="toggleChat()">
         <i class="bi bi-chat-dots-fill"></i>
-        <div class="notification-badge" id="notificationBadge" style="display: none;">1</div>
+        <div class="notification-badge" id="notificationBadge">1</div>
     </button>
 </div>
-{% endif %}
-
-{% include 'layout/footer.html' %}
-<script>
-    // Khởi tạo user info cho real-time
-    {% if current_user.is_authenticated %}
-    window.currentUserId = {{ current_user.id }};
-    window.userType = "{{ 'admin' if current_user.role.name == 'ADMIN' else 'student' }}";
-    {% endif %}
-</script>
-<script src="{{ url_for('static', filename='js/real_time.js') }}"></script>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
-<script src="{{ url_for('static', filename='js/flash-message.js') }}"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
-</body>
-</html>
+{% endblock %}

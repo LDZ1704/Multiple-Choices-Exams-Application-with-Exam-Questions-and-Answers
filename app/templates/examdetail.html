@@ -83,8 +83,8 @@
                     {% set existing_session = dao.get_exam_session(student.id, exam.id) %}
                     {% if existing_session and not existing_session.is_completed %}
                         <div class="notification-box notification-danger mb-3" style="color: #f0ad4e;">
-                            <div class="notification-content">
-                                <i class="fas fa-clock notification-icon"></i>
+                            <div class="notification-content-small">
+                                <i class="fas fa-clock notification-icon-small"></i>
                                 <div class="notification-text">
                                     <strong>Bạn có bài thi chưa hoàn thành!</strong>
                                     <div class="small">
@@ -107,8 +107,8 @@
                         </div>
                     {% elif has_result %}
                         <div class="notification-box notification-success mb-3" style="color: #155724;">
-                            <div class="notification-content">
-                                <i class="fas fa-check-circle notification-icon"></i>
+                            <div class="notification-content-small">
+                                <i class="fas fa-check-circle notification-icon-small"></i>
                                 <div class="notification-text">
                                     <strong>Bạn đã hoàn thành bài thi này!</strong>
                                     <div class="small-text">Điểm số cao nhất: {{ highest_score }}/100</div>
@@ -126,8 +126,7 @@
                                 {% endif %}
                             </div>
                             <div class="col-6">
-                                <a href="{{ url_for('doing_exam', exam_id=exam.id) }}"
-                                   class="btn btn-outline-primary btn-lg w-100 hover-underline-center">
+                                <a class="btn btn-outline-primary btn-lg w-100 hover-underline-center" onclick="confirmRetakeExam()">
                                     <i class="fas fa-redo me-2"></i>Bắt đầu ôn thi lại
                                 </a>
                             </div>
@@ -149,13 +148,87 @@
     </div>
 
     <div class="notification-box notification-warning mt-2">
-        <div class="notification-content">
-            <i class="bi bi-info-circle-fill notification-icon"></i>
+        <div class="notification-content-small">
+            <i class="bi bi-info-circle-fill notification-icon-small"></i>
             <div class="notification-text small-text">
                 Tài liệu ôn thi chỉ có giá trị tham khảo và ôn tập, không phải đề thi thực tế.
             </div>
         </div>
     </div>
+
+    {% if current_user.is_authenticated %}
+    <div class="card border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, #384AD5 0%, #5a67d8 100%);">
+        <div class="card-body text-white">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h5 class="card-title mb-3">
+                        <i class="fas fa-star me-2"></i>Đánh giá đề thi này
+                    </h5>
+
+                    {% if has_result %}
+                        <div id="rating-container">
+                            <p class="mb-2 opacity-75">Trải nghiệm của bạn như thế nào?</p>
+                            <div class="star-rating mb-3" id="star-rating">
+                                <span class="star" data-rating="1">★</span>
+                                <span class="star" data-rating="2">★</span>
+                                <span class="star" data-rating="3">★</span>
+                                <span class="star" data-rating="4">★</span>
+                                <span class="star" data-rating="5">★</span>
+                            </div>
+                            <div id="rating-message" class="rating-message" style="display: none;"></div>
+                        </div>
+                    {% else %}
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-info-circle me-2 fs-5"></i>
+                            <span>Hoàn thành bài thi để đánh giá</span>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="col-md-4 text-center">
+                    <div class="rating-stats-card">
+                        <div class="mb-2">
+                            <div id="average-stars" class="star-display justify-content-center mb-1"></div>
+                            <div class="fs-4 fw-bold">
+                                <span id="average-rating-text">0.0</span><small class="fs-6 opacity-75">/5</small>
+                            </div>
+                            <div id="rating-summary" class="small opacity-75">(0 đánh giá)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <!-- Hiển thị thống kê rating cho user chưa đăng nhập -->
+    <div class="card border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h5 class="card-title text-dark mb-2">
+                        <i class="fas fa-star text-warning me-2"></i>Đánh giá từ cộng đồng
+                    </h5>
+                    <p class="text-muted mb-0">
+                        <a href="{{ url_for('login', next=url_for('exam_detail', id=exam.id)) }}" class="text-decoration-none">Đăng nhập</a>
+                        để đánh giá đề thi này
+                    </p>
+                </div>
+
+                <div class="col-md-4 text-center">
+                    <div class="rating-stats-card">
+                        <div class="mb-2">
+                            <div id="average-stars" class="star-display justify-content-center mb-1"></div>
+                            <div class="fs-4 fw-bold text-dark">
+                                <span id="average-rating-text">0.0</span><small class="fs-6 text-muted">/5</small>
+                            </div>
+                            <div id="rating-summary" class="small opacity-75">(0 đánh giá)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Tab content -->
@@ -185,6 +258,31 @@
             <div class="tab-content">
                 <!-- Tab bình luận -->
                 <div class="tab-pane fade show active" id="reviews">
+                    <div class="card-header d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h5 class="mb-0">
+                                <i class="fas fa-comments"></i> Bình luận & Đánh giá
+                            </h5>
+                            <small class="text-muted">
+                                <span id="comments-count">{{ comments_pagination.total }}</span> bình luận,
+                                <span id="ratings-count">{{ rating_stats.total_ratings }}</span> đánh giá
+                                {% if rating_stats.total_ratings > 0 %}
+                                    • Trung bình:
+                                    <span class="text-warning">
+                                        {% for i in range(1, 6) %}
+                                            {% if i <= rating_stats.average_rating|round %}
+                                                <i class="fas fa-star"></i>
+                                            {% else %}
+                                                <i class="far fa-star"></i>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </span>
+                                    <span class="fw-bold">{{ rating_stats.average_rating }}</span>/5
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+
                     {% if current_user.is_authenticated %}
                     <div class="card mb-4 border-primary">
                         <div class="card-body">
@@ -200,8 +298,8 @@
                     </div>
                     {% else %}
                     <div class="notification-box notification-info">
-                        <div class="notification-content">
-                            <i class="bi bi-info-circle notification-icon"></i>
+                        <div class="notification-content-small">
+                            <i class="bi bi-info-circle notification-icon-small"></i>
                             <div class="notification-text">
                                 <a href="{{ url_for('login', next=url_for('exam_detail', id=exam.id)) }}" class="login-link">Đăng nhập</a>
                                 để viết đánh giá và xem kết quả ôn tập.
@@ -213,29 +311,30 @@
                     <!-- Danh sách bình luận -->
                     {% if comments_pagination.items %}
                     {% for comment in comments_pagination.items %}
-                    <div class="card mb-3 border border-light shadow-sm">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <div class="d-flex align-items-center">
-                                    <img src="{{ comment.user.avatar or url_for('static', filename='images/demo.png') }}"
-                                         class="img-fluid rounded-circle me-3"
-                                         style="width: 3rem; height: 3rem;" alt="avatar">
-                                    <div>
-                                        <strong>{{ comment.user.name }}</strong>
-                                        <br>
-                                        <small class="text-muted">{{ 'Quản trị viên' if comment.user.role.name ==
-                                            'ADMIN' else 'Học sinh' }}</small>
+                        <div class="card mb-3 border border-light shadow-sm">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="d-flex align-items-center">
+                                        <img src="{{ comment.user.avatar or url_for('static', filename='images/demo.png') }}"
+                                             class="img-fluid rounded-circle me-3"
+                                             style="width: 3rem; height: 3rem;" alt="avatar">
+                                        <div>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <strong>{{ comment.user.name }}</strong>
+                                                <div class="user-rating" data-user-id="{{ comment.user.id }}"></div>
+                                            </div>
+                                            <small class="text-muted">{{ 'Quản trị viên' if comment.user.role.name == 'ADMIN' else 'Học sinh' }}</small>
+                                        </div>
                                     </div>
+                                    <small class="text-muted">
+                                        {{ comment.created_at.strftime('%H:%M - %d/%m/%Y') }}
+                                    </small>
                                 </div>
-                                <small class="text-muted">
-                                    {{ comment.created_at.strftime('%H:%M - %d/%m/%Y') }}
-                                </small>
-                            </div>
-                            <div class="text-body">
-                                <p class="mb-0">{{ comment.content }}</p>
+                                <div class="text-body">
+                                    <p class="mb-0">{{ comment.content }}</p>
+                                </div>
                             </div>
                         </div>
-                    </div>
                     {% endfor %}
 
                     <!-- Phân trang đánh giá -->
@@ -738,8 +837,8 @@
                 </div>
 
                 <div class="notification-box notification-info">
-                    <div class="notification-content">
-                        <i class="bi bi-info-circle notification-icon"></i>
+                    <div class="notification-content-small">
+                        <i class="bi bi-info-circle notification-icon-small"></i>
                         <div class="notification-text small-text">
                             Điểm số cao nhất của bạn sẽ được lưu lại để so sánh.
                         </div>
@@ -809,6 +908,7 @@
     </div>
 </div>
 
+<script src="{{ url_for('static', filename='js/rating.js') }}"></script>
 <script>
     const userAnswers = {{ (existing_session.user_answers | tojson) if existing_session and existing_session.user_answers else '{}' }};
     window.sessionData = {

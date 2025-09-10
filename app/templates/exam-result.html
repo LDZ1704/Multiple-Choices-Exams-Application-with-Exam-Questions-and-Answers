@@ -323,6 +323,99 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Charts Analysis Section -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-header bg-light">
+                                        <h5 class="card-title mb-0 fs-4">
+                                            <i class="fas fa-chart-line me-2"></i>
+                                            Phân Tích Biểu Đồ
+                                        </h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="nav nav-pills mb-4" id="resultChartTabs" role="tablist">
+                                            <li class="nav-item">
+                                                <button class="nav-link active" id="performance-radar-tab" data-bs-toggle="tab" data-bs-target="#performance-radar" type="button">
+                                                    <i class="fas fa-radar-chart me-1"></i>Tổng Quan Hiệu Suất
+                                                </button>
+                                            </li>
+                                            <li class="nav-item">
+                                                <button class="nav-link" id="score-comparison-tab" data-bs-toggle="tab" data-bs-target="#score-comparison" type="button">
+                                                    <i class="fas fa-line-chart me-1"></i>So Sánh Điểm
+                                                </button>
+                                            </li>
+                                            <li class="nav-item">
+                                                <button class="nav-link" id="question-analysis-tab" data-bs-toggle="tab" data-bs-target="#question-analysis" type="button">
+                                                    <i class="fas fa-pie-chart me-1"></i>Phân Tích Câu Hỏi
+                                                </button>
+                                            </li>
+                                        </ul>
+
+                                        <!-- Chart Content -->
+                                        <div class="tab-content" id="resultChartTabsContent">
+                                            <div class="tab-pane fade show active" id="performance-radar">
+                                                <div class="row">
+                                                    <div class="col-md-8">
+                                                        <canvas id="performanceRadarChart"></canvas>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <div class="mt-3">
+                                                            <h6 class="text-muted">Giải thích chỉ số:</h6>
+                                                            <div class="small">
+                                                                <div class="mb-2">
+                                                                    <i class="fas fa-circle text-primary me-1"></i>
+                                                                    <strong>Điểm số:</strong> Kết quả bài thi
+                                                                </div>
+                                                                <div class="mb-2">
+                                                                    <i class="fas fa-circle text-success me-1"></i>
+                                                                    <strong>Thời gian:</strong> Hiệu quả sử dụng thời gian
+                                                                </div>
+                                                                <div class="mb-2">
+                                                                    <i class="fas fa-circle text-info me-1"></i>
+                                                                    <strong>Độ chính xác:</strong> Tỷ lệ câu trả lời đúng
+                                                                </div>
+                                                                <div class="mb-2">
+                                                                    <i class="fas fa-circle text-warning me-1"></i>
+                                                                    <strong>Hiệu quả:</strong> Tỷ lệ điểm/thời gian
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="tab-pane fade" id="score-comparison">
+                                                <div class="row">
+                                                    <div class="col-12">
+                                                        <canvas id="scoreComparisonChart"></canvas>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="tab-pane fade" id="question-analysis">
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <canvas id="questionAnalysisChart"></canvas>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mt-3">
+                                                            <h6 class="text-muted">Phân tích chi tiết:</h6>
+                                                            <div id="questionDetailsInfo">
+                                                                <div class="text-center text-muted">
+                                                                    <i class="fas fa-spinner fa-spin"></i> Đang phân tích...
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -349,8 +442,8 @@
                 </div>
 
                 <div class="notification-box notification-info">
-                    <div class="notification-content">
-                        <i class="bi bi-info-circle notification-icon"></i>
+                    <div class="notification-content-small">
+                        <i class="bi bi-info-circle notification-icon-small"></i>
                         <div class="notification-text small-text">
                             Điểm số cao nhất của bạn sẽ được lưu lại để so sánh.
                         </div>
@@ -368,4 +461,332 @@
         </div>
     </div>
 </div>
+
+<script>
+    function getExamId() {
+        if (typeof examId !== 'undefined') return examId;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlExamId = urlParams.get('id') || urlParams.get('exam_id');
+        if (urlExamId) return urlExamId;
+
+        const pathMatch = window.location.pathname.match(/doing-exam\/(\d+)/);
+        if (pathMatch) return pathMatch[1];
+
+        const examElement = document.querySelector('[data-exam-id]');
+        if (examElement) return examElement.dataset.examId;
+
+        return null;
+    }
+
+    function confirmRetakeExam() {
+        const modal = new bootstrap.Modal(document.getElementById('retakeExamModal'));
+        modal.show();
+    }
+
+    function retakeExam() {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('retakeExamModal'));
+        modal.hide();
+
+        const examId = getExamId();
+        if (!examId) {
+            alert('Không thể xác định bài thi!');
+            return;
+        }
+        showLoadingOverlay('Đang khởi tạo bài thi mới...', 'Vui lòng đợi trong giây lát');
+        window.location.href = `/doing-exam/${examId}`;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const resultId = {{ result.id }};
+        if (resultId) {
+            loadExamResultCharts(resultId);
+        }
+    });
+
+    function loadExamResultCharts(resultId) {
+        fetch(`/api/exam-result/charts/${resultId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.text();
+            })
+            .then(text => {
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error('Response is not JSON:', text);
+                    throw new Error('Invalid JSON response');
+                }
+            })
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                createPerformanceRadarChart(data.performance_radar);
+                createScoreComparisonChart(data.score_comparison);
+                createQuestionAnalysisChart(data.question_analysis);
+                updateResultAnalysisInfo(data);
+            })
+            .catch(error => {
+                console.error('Error loading result charts:', error);
+                showResultChartError(error.message);
+            });
+    }
+
+    function createPerformanceRadarChart(data) {
+        const ctx = document.getElementById('performanceRadarChart');
+        if (!ctx) return;
+
+        new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Hiệu suất của bạn',
+                    data: data.data,
+                    borderColor: '#384AD5',
+                    backgroundColor: 'rgba(56, 74, 213, 0.2)',
+                    pointBackgroundColor: '#384AD5'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Tổng Quan Hiệu Suất Bài Thi'
+                    }
+                },
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+    }
+
+    function createScoreComparisonChart(data) {
+        const ctx = document.getElementById('scoreComparisonChart');
+        if (!ctx) return;
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Điểm số các lần thi',
+                    data: data.data,
+                    borderColor: '#28a745',
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'So Sánh Điểm Các Lần Thi'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+    }
+
+    function createQuestionAnalysisChart(data) {
+        const ctx = document.getElementById('questionAnalysisChart');
+        if (!ctx) return;
+
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    data: data.data,
+                    backgroundColor: [
+                        '#28a745', // Đúng - xanh lá
+                        '#dc3545'  // Sai - đỏ
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Phân Tích Câu Trả Lời'
+                    },
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+
+    function updateResultAnalysisInfo(data) {
+        // Cập nhật thông tin phân tích câu hỏi
+        const questionContainer = document.getElementById('questionDetailsInfo');
+        if (questionContainer && data.question_analysis) {
+            const total = data.question_analysis.data.reduce((a, b) => a + b, 0);
+            const correct = data.question_analysis.data[0] || 0;
+            const accuracy = total > 0 ? (correct / total * 100).toFixed(1) : 0;
+
+            questionContainer.innerHTML = `
+                <div class="alert alert-${accuracy >= 80 ? 'success' : accuracy >= 65 ? 'info' : accuracy >= 50 ? 'warning' : 'danger'}">
+                    <h6 class="mb-2">Độ chính xác: ${accuracy}%</h6>
+                    <p class="mb-1">Số câu đúng: ${correct}/${total}</p>
+                    <p class="mb-0">
+                        ${accuracy >= 80 ? 'Excellent! Bạn đã trả lời rất chính xác.' :
+                          accuracy >= 65 ? 'Good! Kết quả khá tốt.' :
+                          accuracy >= 50 ? 'Average. Cần cải thiện thêm.' :
+                          'Cần ôn tập kỹ hơn các kiến thức cơ bản.'}
+                    </p>
+                </div>
+            `;
+        }
+    }
+
+    function showResultChartError(errorMessage = 'Không thể tải dữ liệu biểu đồ') {
+        const chartContainers = ['performanceRadarChart', 'scoreComparisonChart', 'questionAnalysisChart'];
+        chartContainers.forEach(id => {
+            const container = document.getElementById(id);
+            if (container) {
+                container.parentElement.innerHTML = `
+                    <div class="text-center text-muted p-3">
+                        <i class="fas fa-exclamation-triangle mb-2"></i><br>
+                        ${errorMessage}
+                    </div>
+                `;
+            }
+        });
+    }
+
+    // Thêm function để kiểm tra dữ liệu trước khi tạo chart
+    function createPerformanceRadarChart(data) {
+        const ctx = document.getElementById('performanceRadarChart');
+        if (!ctx || !data || !data.labels || !data.data) {
+            console.error('Invalid radar chart data:', data);
+            return;
+        }
+
+        new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Hiệu suất của bạn',
+                    data: data.data,
+                    borderColor: '#384AD5',
+                    backgroundColor: 'rgba(56, 74, 213, 0.2)',
+                    pointBackgroundColor: '#384AD5'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Tổng Quan Hiệu Suất Bài Thi'
+                    }
+                },
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+    }
+
+    function createScoreComparisonChart(data) {
+        const ctx = document.getElementById('scoreComparisonChart');
+        if (!ctx || !data || !data.labels || !data.data) {
+            console.error('Invalid score comparison chart data:', data);
+            return;
+        }
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Điểm số các lần thi',
+                    data: data.data,
+                    borderColor: '#28a745',
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'So Sánh Điểm Các Lần Thi'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+    }
+
+    function createQuestionAnalysisChart(data) {
+        const ctx = document.getElementById('questionAnalysisChart');
+        if (!ctx || !data || !data.labels || !data.data) {
+            console.error('Invalid question analysis chart data:', data);
+            return;
+        }
+
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    data: data.data,
+                    backgroundColor: [
+                        '#28a745', // Đúng - xanh lá
+                        '#dc3545'  // Sai - đỏ
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Phân Tích Câu Trả Lời'
+                    },
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+</script>
 {% endblock %}

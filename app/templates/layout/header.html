@@ -29,6 +29,9 @@
                     </li>
                     {% if current_user.is_authenticated %}
                     <li class="nav-item">
+                        <a class="nav-link text-white text-decoration-none hover-underline-center" href="/recommendations">Gợi ý ôn tập</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link text-white text-decoration-none hover-underline-center" href="/exam-history">Bài thi đã làm</a>
                     </li>
                     <li class="nav-item">
@@ -47,6 +50,35 @@
                             Xin chào, {{ current_user.name }}
                             <img src="{{ current_user.avatar }}" alt="avatar" width="30" style="border-radius: 10px">
                         </a>
+                    </li>
+                    <li class="nav-item dropdown position-relative">
+                        <a class="nav-link text-white position-relative"
+                           href="#"
+                           id="notificationDropdown"
+                           onclick="toggleNotificationDropdown(event)">
+                            <i class="bi bi-bell"></i>
+                            <span id="notification-badge"
+                                  class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                                  style="display: {{ 'inline' if unread_notifications_count > 0 else 'none' }};">
+                                {{ unread_notifications_count if unread_notifications_count > 0 else '' }}
+                            </span>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end notification-dropdown" id="notificationDropdownMenu">
+                            <div class="dropdown-header">
+                                <span><i class="bi bi-bell me-2"></i>Thông báo</span>
+                                <a href="{{ url_for('notifications') }}" class="text-decoration-none">Xem tất cả</a>
+                            </div>
+                            <hr class="dropdown-divider">
+                            <div id="notification-list">
+                                <!-- Notifications load here via JavaScript -->
+                            </div>
+                            <hr class="dropdown-divider">
+                            <div class="dropdown-footer">
+                                <button class="btn btn-outline-primary btn-sm" onclick="markAllNotificationsAsRead()">
+                                    <i class="bi bi-check-all"></i> Đánh dấu tất cả đã đọc
+                                </button>
+                            </div>
+                        </div>
                     </li>
                     {% else %}
                     <li class="nav-item">

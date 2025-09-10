@@ -37,6 +37,10 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    window.USER_ID = window.currentUserId || null;
+    window.isTyping = false;
+    window.chatOpen = false;
 });
 
 //Chức năng search
@@ -466,5 +470,373 @@ document.getElementById('togglePassword2').addEventListener('click', function() 
     } else {
         passwordInput.type = 'password';
         toggleIcon2.className = 'bi bi-eye';
+    }
+});
+
+//Chức năng cho chatbot
+function toggleChat() {
+    const chatWindow = document.getElementById('chatWindow');
+    const chatToggle = document.getElementById('chatToggle');
+    const notificationBadge = document.getElementById('notificationBadge');
+
+    chatOpen = !chatOpen;
+
+    if (chatOpen) {
+        chatWindow.classList.add('show');
+        chatToggle.classList.add('active');
+        chatToggle.innerHTML = '<i class="bi bi-x-lg"></i>';
+        if (notificationBadge) notificationBadge.style.display = 'none';
+
+        setTimeout(() => {
+            document.getElementById('messageInput').focus();
+        }, 300);
+    } else {
+        chatWindow.classList.remove('show');
+        chatToggle.classList.remove('active');
+        chatToggle.innerHTML = '<i class="bi bi-chat-dots-fill"></i><div class="notification-badge" id="notificationBadge" style="display: none;"></div>';
+    }
+}
+
+function autoResize(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
+}
+
+function addMessage(content, isUser = false) {
+    const messagesContainer = document.getElementById('chatMessages');
+    const welcomeMessage = messagesContainer.querySelector('.welcome-message');
+
+    if (welcomeMessage && welcomeMessage.style.display !== 'none') {
+        welcomeMessage.style.display = 'none';
+    }
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+
+    const now = new Date();
+    const timeStr = now.getHours().toString().padStart(2, '0') + ':' +
+                   now.getMinutes().toString().padStart(2, '0');
+
+    messageDiv.innerHTML = `
+        <div class="message-bubble">
+            ${content.replace(/\n/g, '<br>')}
+        </div>
+        <div class="message-time">${timeStr}</div>
+    `;
+
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function showTyping() {
+    if (!isTyping) {
+        isTyping = true;
+        document.getElementById('typingIndicator').style.display = 'block';
+        const messagesContainer = document.getElementById('chatMessages');
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+}
+
+function hideTyping() {
+    isTyping = false;
+    document.getElementById('typingIndicator').style.display = 'none';
+}
+
+async function sendMessage() {
+    const input = document.getElementById('messageInput');
+    const sendButton = document.getElementById('sendButton');
+    const message = input.value.trim();
+
+    if (!message) return;
+
+    input.disabled = true;
+    sendButton.disabled = true;
+
+    addMessage(message, true);
+    input.value = '';
+    input.style.height = 'auto';
+
+    try {
+        showTyping();
+
+        const response = await fetch('/api/chatbot', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                message: message,
+                user_id: USER_ID
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        setTimeout(() => {
+            hideTyping();
+            addMessage(data.response);
+        }, 1000);
+
+    } catch (error) {
+        console.error('Chatbot error:', error);
+        hideTyping();
+        addMessage('Xin lỗi, có lỗi xảy ra khi kết nối với trợ lý AI. Vui lòng thử lại sau!');
+    } finally {
+        setTimeout(() => {
+            input.disabled = false;
+            sendButton.disabled = false;
+            input.focus();
+        }, 1500);
+    }
+}
+
+function sendQuickMessage(message) {
+    const input = document.getElementById('messageInput');
+    input.value = message;
+    sendMessage();
+}
+
+function handleKeyPress(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+    }
+}
+
+setTimeout(() => {
+    if (!chatOpen && USER_ID) {
+        const badge = document.getElementById('notificationBadge');
+        if (badge) {
+            badge.style.display = 'flex';
+        }
+    }
+}, 5000);
+
+//Notifications
+document.addEventListener('DOMContentLoaded', function() {
+    initializeNotifications();
+});
+
+function initializeNotifications() {
+    const notificationDropdown = document.getElementById('notificationDropdown');
+    const notificationBadge = document.getElementById('notification-badge');
+
+    if (notificationDropdown) {
+        notificationDropdown.addEventListener('click', function(e) {
+            e.preventDefault();
+            toggleNotificationDropdown(e);
+        });
+    }
+
+    if (notificationBadge) {
+        updateNotificationCount();
+        setInterval(updateNotificationCount, 30000);
+    }
+
+    document.addEventListener('click', function(event) {
+        const dropdown = document.getElementById('notificationDropdownMenu');
+        const toggle = document.getElementById('notificationDropdown');
+
+        if (!dropdown.contains(event.target) && !toggle.contains(event.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+}
+
+function loadRecentNotifications() {
+    const listContainer = document.getElementById('notification-list');
+    if (!listContainer) {
+        return;
+    }
+    listContainer.innerHTML = '<div class="notification-loading"><div class="spinner-border spinner-border-sm"></div><span class="ms-2">Đang tải...</span></div>';
+
+    fetch('/api/notifications/recent')
+        .then(response => response.json())
+        .then(data => {
+            if (!data.notifications || data.notifications.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="empty-notifications">
+                        <i class="bi bi-bell-slash"></i>
+                        <div class="mt-2">Không có thông báo mới</div>
+                    </div>
+                `;
+                return;
+            }
+            listContainer.innerHTML = '';
+            data.notifications.forEach(notification => {
+                const item = document.createElement('div');
+                item.className = `notification-item ${!notification.is_read ? 'notification-unread' : ''}`;
+                const iconClass = getNotificationIcon(notification.type);
+                const message = notification.message || '';
+                const displayMessage = message.length > 80 ? message.substring(0, 80) + '...' : message;
+                item.innerHTML = `
+                    <div class="notification-content">
+                        <div class="notification-icon ${notification.type}">
+                            <i class="bi ${iconClass}"></i>
+                        </div>
+                        <div class="notification-body">
+                            <div class="notification-title">${escapeHtml(notification.title || 'Thông báo')}</div>
+                            <div class="notification-message">${escapeHtml(displayMessage)}</div>
+                            <div class="notification-time">
+                                <i class="bi bi-clock"></i>
+                                ${notification.created_at}
+                            </div>
+                        </div>
+                        ${!notification.is_read ? '<div class="notification-badge">Mới</div>' : ''}
+                    </div>
+                `;
+                item.onclick = () => {
+                    if (!notification.is_read) {
+                        markNotificationAsRead(notification.id);
+                    }
+                    if (notification.exam_id) {
+                        window.location.href = `/examdetail?id=${notification.exam_id}`;
+                    }
+                };
+                listContainer.appendChild(item);
+            });
+        })
+        .catch(error => {
+            console.error('Error loading notifications:', error);
+            listContainer.innerHTML = `
+                <div class="empty-notifications">
+                    <i class="bi bi-bell-slash"></i>
+                    <div class="mt-2">Lỗi tải thông báo</div>
+                </div>
+            `;
+        });
+}
+
+function getNotificationIcon(type) {
+    switch(type) {
+        case 'result': return 'bi-trophy';
+        case 'reminder': return 'bi-clock';
+        case 'suggestion': return 'bi-lightbulb';
+        case 'new_exam': return 'bi-file-earmark-plus';
+        default: return 'bi-info-circle';
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatTimeAgo(dateString) {
+    try {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffInSeconds = Math.floor((now - date) / 1000);
+
+        if (diffInSeconds < 60) return 'Vừa xong';
+        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} phút trước`;
+        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} giờ trước`;
+        return date.toLocaleDateString('vi-VN');
+    } catch (error) {
+        return dateString;
+    }
+}
+
+function updateNotificationCount() {
+    const badge = document.getElementById('notification-badge');
+    if (!badge) {
+        return;
+    }
+
+    fetch('/api/notifications/unread-count')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.count > 0) {
+                badge.textContent = data.count;
+                badge.style.display = 'inline';
+            } else {
+                badge.style.display = 'none';
+            }
+        })
+        .catch(error => console.error('Error updating notification count:', error));
+}
+
+function markNotificationAsRead(notificationId) {
+    fetch(`/api/notifications/mark-read/${notificationId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const badge = document.getElementById('notification-badge');
+            if (badge) {
+                const currentCount = parseInt(badge.textContent) || 0;
+                const newCount = Math.max(0, currentCount - 1);
+                if (newCount === 0) {
+                    badge.style.display = 'none';
+                } else {
+                    badge.textContent = newCount;
+                }
+            }
+            loadRecentNotifications();
+        }
+    })
+    .catch(error => {
+        console.error('Error marking notification as read:', error);
+    });
+}
+
+function markAllNotificationsAsRead() {
+    fetch('/api/notifications/mark-all-read', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const badge = document.getElementById('notification-badge');
+            if (badge) {
+                badge.style.display = 'none';
+            }
+            loadRecentNotifications();
+        }
+    })
+    .catch(error => {
+        console.error('Error marking all notifications as read:', error);
+    });
+}
+
+function toggleNotificationDropdown(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const dropdown = document.getElementById('notificationDropdownMenu');
+    const isVisible = dropdown.style.display === 'block';
+
+    if (isVisible) {
+        dropdown.style.display = 'none';
+    } else {
+        dropdown.style.display = 'block';
+        loadRecentNotifications();
+    }
+}
+
+document.addEventListener('click', function(event) {
+    const dropdown = document.getElementById('notificationDropdownMenu');
+    const toggle = document.getElementById('notificationDropdown');
+
+    if (dropdown && toggle && !dropdown.contains(event.target) && !toggle.contains(event.target)) {
+        dropdown.style.display = 'none';
     }
 });

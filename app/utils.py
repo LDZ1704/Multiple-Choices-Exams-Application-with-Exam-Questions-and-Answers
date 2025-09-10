@@ -5,8 +5,10 @@ import cloudinary.uploader
 import hashlib
 from flask import session, flash
 from app import app, db, dao
-from app.models import User, ExamResult, ExamQuestions, Exam, Comment, Student, Question, Answer, ExamSession
+from app.models import User, ExamResult, ExamQuestions, Exam, Comment, Student, Question, Answer, ExamSession, \
+    SuspiciousActivity, Notification
 from datetime import datetime
+from notification_service import NotificationService
 
 
 def generate_otp():
@@ -180,6 +182,10 @@ def save_exam_result(student_id, exam_id, score, answers, time_taken_seconds):
 
         db.session.add(exam_result)
         db.session.commit()
+        NotificationService.send_exam_result_notification(student_id, exam_id, score)
+        dao.check_milestone_achievement(student_id)
+        if score < 40:
+            NotificationService.send_improvement_suggestion(student_id)
 
         return exam_result.id
 
@@ -242,11 +248,13 @@ def create_exam(creator_id, exam_name, subject_id, duration, questions_data):
         db.session.add(exam)
         db.session.flush()
 
+        if exam.id:
+            dao.create_exam_notification(exam.id)
+
         for question_data in questions_data:
             question = Question(
                 question_title=question_data['question_title'],
                 chapter_id=1, #default
-                user_id=creator_id,
                 createBy=user.name,
                 createAt=datetime.now()
             )
@@ -258,7 +266,6 @@ def create_exam(creator_id, exam_name, subject_id, duration, questions_data):
                     question_id=question.id,
                     answer_text=answer_data['answer_text'],
                     is_correct=answer_data['is_correct'],
-                    user_id=creator_id,
                     createBy=user.name
                 )
                 db.session.add(answer)
@@ -268,7 +275,6 @@ def create_exam(creator_id, exam_name, subject_id, duration, questions_data):
                 question_id=question.id
             )
             db.session.add(exam_question)
-
         db.session.commit()
         return exam.id
 
@@ -313,7 +319,6 @@ def update_exam(exam_id, creator_id, exam_name, subject_id, duration, questions_
             question = Question(
                 question_title=question_data['question_title'],
                 chapter_id=1,  #Default
-                user_id=creator_id,
                 createBy=user.name,
                 createAt=datetime.now()
             )
@@ -325,7 +330,6 @@ def update_exam(exam_id, creator_id, exam_name, subject_id, duration, questions_
                     question_id=question.id,
                     answer_text=answer_data['answer_text'],
                     is_correct=answer_data['is_correct'],
-                    user_id=creator_id,
                     createBy=user.name
                 )
                 db.session.add(answer)
@@ -347,29 +351,23 @@ def update_exam(exam_id, creator_id, exam_name, subject_id, duration, questions_
 
 def delete_user_exam(exam_id, creator_id):
     try:
-        exam = db.session.query(Exam).filter(
-            Exam.id == exam_id,
-            Exam.user_id == creator_id
-        ).first()
+        exam = db.session.query(Exam).filter(Exam.id == exam_id, Exam.user_id == creator_id).first()
 
         if not exam:
             return False
 
+        db.session.query(Notification).filter(Notification.exam_id == exam_id).delete()
+        db.session.query(ExamSession).filter(ExamSession.exam_id == exam_id).delete()
+        db.session.query(SuspiciousActivity).filter(SuspiciousActivity.exam_id == exam_id).delete()
         db.session.query(ExamResult).filter(ExamResult.exam_id == exam_id).delete()
-
         db.session.query(Comment).filter(Comment.exam_id == exam_id).delete()
-
-        exam_questions = db.session.query(ExamQuestions).filter(
-            ExamQuestions.exam_id == exam_id
-        ).all()
+        exam_questions = db.session.query(ExamQuestions).filter(ExamQuestions.exam_id == exam_id).all()
         question_ids = [eq.question_id for eq in exam_questions]
 
         for eq in exam_questions:
             db.session.delete(eq)
-
         for question_id in question_ids:
             db.session.query(Answer).filter(Answer.question_id == question_id).delete()
-
         for question_id in question_ids:
             db.session.query(Question).filter(Question.id == question_id).delete()
 
@@ -589,3 +587,5 @@ def get_ordered_questions_for_session(exam_id, question_order, answer_orders):
     except Exception as e:
         print(f"Error getting ordered questions: {e}")
         return []
+
+

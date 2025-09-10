@@ -1,0 +1,712 @@
+{% extends 'layout/base.html' %}
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm bg-gradient-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="mb-1"><i class="fas fa-brain me-2"></i>Đề xuất học tập cá nhân</h2>
+                            <p class="mb-0 opacity-75">Phân tích thông minh dựa trên kết quả học tập của bạn</p>
+                        </div>
+                        <div>
+                            <button class="btn btn-light me-2" onclick="generateStudyPlan()">
+                                <i class="fas fa-calendar-alt me-2"></i>Tạo kế hoạch
+                            </button>
+                            <button class="btn btn-outline-light" onclick="refreshRecommendations()">
+                                <i class="fas fa-sync-alt me-2"></i>Làm mới
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mb-3">
+            <!-- Performance Analysis -->
+            {% if analysis %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h5 class="mb-0"><i class="fas fa-chart-line me-2 text-primary"></i>Phân tích học tập</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h3 class="text-primary mb-1">{{ analysis.total_exams }}</h3>
+                                <small class="text-muted">Tổng số bài thi</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h3 class="text-success mb-1">{{ "%.1f"|format(analysis.average_score) }}</h3>
+                                <small class="text-muted">Điểm trung bình</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h6 class="text-success mb-1 fs-3">{{ analysis.best_subject }}</h6>
+                                <small class="text-muted">Môn học tốt nhất</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h6 class="text-warning mb-1 fs-3">{{ analysis.worst_subject }}</h6>
+                                <small class="text-muted">Cần cải thiện</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Trend and Pattern Analysis -->
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="border-start border-4 border-info ps-3">
+                                <h6 class="mb-1">Xu hướng học tập</h6>
+                                {% if analysis.improvement_trend == 'improving' %}
+                                    <span class="badge bg-success-subtle text-success">
+                                        <i class="fas fa-arrow-up me-1"></i>Đang tiến bộ
+                                    </span>
+                                {% elif analysis.improvement_trend == 'declining' %}
+                                    <span class="badge bg-danger-subtle text-danger">
+                                        <i class="fas fa-arrow-down me-1"></i>Đang giảm
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary-subtle text-secondary">
+                                        <i class="fas fa-minus me-1"></i>Ổn định
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="border-start border-4 border-warning ps-3">
+                                <h6 class="mb-1">Thời gian học ưa thích</h6>
+                                <span class="badge bg-warning-subtle text-warning">
+                                    <i class="fas fa-clock me-1"></i>{{ analysis.study_pattern.preferred_time }}:00
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="border-start border-4 border-primary ps-3">
+                                <h6 class="mb-1">Tần suất học tập</h6>
+                                <span class="badge bg-primary-subtle text-primary">
+                                    <i class="fas fa-calendar me-1"></i>{{ "%.1f"|format(analysis.study_pattern.study_frequency) }} lần/ngày
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if analysis.weak_areas %}
+                    <div class="mt-4">
+                        <h6 class="mb-2">Lĩnh vực cần cải thiện:</h6>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for area in analysis.weak_areas %}
+                                <span class="badge bg-warning-subtle text-warning border border-warning">{{ area }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if analysis.study_pattern %}
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Điểm nhất quán</h6>
+                            <span class="text-muted">{{ (analysis.study_pattern.consistency_score * 100)|int }}%</span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-gradient" role="progressbar"
+                                 style="width: {{ (analysis.study_pattern.consistency_score * 100)|int }}%"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Recommendations Section -->
+            {% if recommendations %}
+            <div class="card shadow-sm">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h5 class="mb-0"><i class="fas fa-lightbulb me-2 text-warning"></i>Đề xuất cho bạn</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        {% for rec in recommendations %}
+                        <div class="col-md-6">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-start">
+                                        <div class="me-3">
+                                            {% if rec.type == 'book' %}
+                                                <div class="bg-primary-subtle text-primary rounded-circle p-2">
+                                                    <i class="fas fa-book"></i>
+                                                </div>
+                                            {% elif rec.type == 'video' %}
+                                                <div class="bg-danger-subtle text-danger rounded-circle p-2">
+                                                    <i class="fas fa-play"></i>
+                                                </div>
+                                            {% elif rec.type == 'practice_exam' %}
+                                                <div class="bg-success-subtle text-success rounded-circle p-2">
+                                                    <i class="fas fa-file-alt"></i>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+
+                                        <div class="flex-grow-1">
+                                            <h6 class="card-title mb-2">{{ rec.title }}</h6>
+
+                                            {% if rec.type == 'book' and rec.authors %}
+                                                <div class="text-muted small mb-2">
+                                                    <i class="fas fa-user me-1"></i>{{ rec.authors }}
+                                                </div>
+                                            {% elif rec.type == 'video' and rec.channel %}
+                                                <div class="text-muted small mb-2">
+                                                    <i class="fas fa-tv me-1"></i>{{ rec.channel }}
+                                                </div>
+                                            {% elif rec.type == 'practice_exam' %}
+                                                <div class="d-flex align-items-center gap-2 mb-2">
+                                                    <span class="badge bg-secondary-subtle text-secondary">
+                                                        <i class="fas fa-clock me-1"></i>{{ rec.duration }} phút
+                                                    </span>
+                                                    {% if rec.subject %}
+                                                        <span class="badge bg-info-subtle text-info">{{ rec.subject }}</span>
+                                                    {% endif %}
+                                                    <span class="badge bg-{{ 'success' if rec.difficulty == 'easy' else 'warning' if rec.difficulty == 'medium' else 'danger' }}-subtle
+                                                                text-{{ 'success' if rec.difficulty == 'easy' else 'warning' if rec.difficulty == 'medium' else 'danger' }}">
+                                                        {{ rec.difficulty }}
+                                                    </span>
+                                                </div>
+                                            {% endif %}
+
+                                            {% if rec.description %}
+                                                <p class="card-text small text-muted">{{ rec.description[:100] }}...</p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-transparent border-0">
+                                    <a href="{{ rec.link }}" class="btn btn-sm btn-outline-primary stretched-link"
+                                       {% if rec.type in ['book', 'video'] %}target="_blank"{% endif %}>
+                                        {% if rec.type == 'practice_exam' %}
+                                            <i class="fas fa-play me-1"></i>Làm bài thi
+                                        {% else %}
+                                            <i class="fas fa-external-link-alt me-1"></i>Xem chi tiết
+                                        {% endif %}
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="card shadow-sm">
+                <div class="card-body text-center py-5">
+                    <div class="text-muted mb-3">
+                        <i class="fas fa-book-open fa-3x"></i>
+                    </div>
+                    <h5 class="text-muted">Chưa có đề xuất</h5>
+                    <p class="text-muted">Hãy làm thêm một vài bài thi để chúng tôi có thể đưa ra đề xuất phù hợp cho bạn!</p>
+                    <a href="/" class="btn btn-primary">
+                        <i class="fas fa-arrow-right me-2"></i>Khám phá đề thi
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-lg-4 mb-3">
+            <!-- Achievement Badges -->
+            {% if badges %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h6 class="mb-0"><i class="fas fa-award me-2 text-warning"></i>Huy hiệu thành tích</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        {% for badge in badges %}
+                        <div class="col-6">
+                            <div class="text-center p-3 border rounded position-relative">
+                                <div class="mb-2">
+                                    <i class="{{ badge.icon }} fa-2x" style="color: {{ badge.color }};"></i>
+                                </div>
+                                <h6 class="mb-1">{{ badge.name }}</h6>
+                                <small class="text-muted">{{ badge.description }}</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Ranking Section -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h6 class="mb-0"><i class="fas fa-trophy me-2 text-success"></i>Xếp hạng của bạn</h6>
+                </div>
+                <div class="card-body">
+                    {% if overall_ranking and overall_ranking.rank %}
+                    <!-- Overall Ranking -->
+                    <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded mb-3">
+                        <div>
+                            <h6 class="mb-1">Xếp hạng tổng</h6>
+                            <small class="text-muted">Tất cả thời gian</small>
+                        </div>
+                        <div class="text-end">
+                            <h4 class="mb-0 text-primary">#{{ overall_ranking.rank }}</h4>
+                            <small class="text-muted">/ {{ overall_ranking.total_students }}</small>
+                        </div>
+                    </div>
+
+                    <!-- Monthly Ranking -->
+                    {% if monthly_ranking and monthly_ranking.rank %}
+                    <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded mb-3">
+                        <div>
+                            <h6 class="mb-1">Xếp hạng tháng này</h6>
+                            <small class="text-muted">30 ngày qua</small>
+                        </div>
+                        <div class="text-end">
+                            <h4 class="mb-0 text-success">#{{ monthly_ranking.rank }}</h4>
+                            <small class="text-muted">/ {{ monthly_ranking.total_students }}</small>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Subject Ranking -->
+                    {% if subject_ranking %}
+                    <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded">
+                        <div>
+                            <h6 class="mb-1">{{ subject_ranking.subject }}</h6>
+                            <small class="text-muted">Môn cần cải thiện</small>
+                        </div>
+                        <div class="text-end">
+                            <h4 class="mb-0 text-warning">#{{ subject_ranking.rank }}</h4>
+                            <small class="text-muted">/ {{ subject_ranking.total_students }}</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <div class="text-center py-3">
+                        <div class="text-muted mb-2">
+                            <i class="fas fa-chart-bar fa-2x"></i>
+                        </div>
+                        <p class="text-muted mb-0">Chưa có dữ liệu xếp hạng</p>
+                        <small class="text-muted">Làm bài thi để xem thứ hạng</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Leaderboard -->
+            {% if leaderboard %}
+            <div class="card shadow-sm">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h6 class="mb-0"><i class="fas fa-crown me-2 text-warning"></i>Bảng xếp hạng</h6>
+                </div>
+                <div class="card-body">
+                    {% for leader in leaderboard %}
+                    <div class="d-flex align-items-center {% if not loop.last %}mb-3{% endif %}">
+                        <div class="me-3">
+                            {% if leader.rank <= 3 %}
+                                <div class="bg-{{ 'warning' if leader.rank == 1 else 'secondary' if leader.rank == 2 else 'dark' }}
+                                           text-white rounded-circle d-flex align-items-center justify-content-center"
+                                     style="width: 32px; height: 32px;">
+                                    <i class="fas fa-crown"></i>
+                                </div>
+                            {% else %}
+                                <div class="bg-light text-muted rounded-circle d-flex align-items-center justify-content-center"
+                                     style="width: 32px; height: 32px;">
+                                    {{ leader.rank }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0">{{ leader.student_name }}</h6>
+                            <small class="text-muted">{{ leader.avg_score }} điểm • {{ leader.exam_count }} bài</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Study Plan Modal -->
+    <div class="modal fade" id="studyPlanModal" tabindex="-1" aria-labelledby="studyPlanModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title" id="studyPlanModalLabel">
+                        <i class="fas fa-calendar-alt me-2 text-primary"></i>Kế hoạch học tập cá nhân
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="studyPlanContent">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Đang tạo kế hoạch...</span>
+                            </div>
+                            <p class="mt-3 text-muted">Đang phân tích dữ liệu và tạo kế hoạch học tập phù hợp...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ranking Details Modal -->
+    <div class="modal fade" id="rankingModal" tabindex="-1" aria-labelledby="rankingModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title" id="rankingModalLabel">
+                        <i class="fas fa-chart-bar me-2 text-success"></i>Chi tiết xếp hạng
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="rankingContent">
+                        <!-- Content will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.bg-gradient-primary {
+    background: #384AD5;
+}
+
+.progress-bar.bg-gradient {
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+}
+
+.card {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
+}
+
+.badge {
+    font-weight: 500;
+}
+
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.rounded-circle {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (max-width: 768px) {
+    .container-fluid {
+        padding: 0 15px;
+    }
+
+    .card-body {
+        padding: 1rem;
+    }
+}
+</style>
+
+<script>
+function refreshRecommendations() {
+    const refreshBtn = document.querySelector('[onclick="refreshRecommendations()"]');
+    const originalContent = refreshBtn.innerHTML;
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Đang tải...';
+    refreshBtn.disabled = true;
+
+    fetch('/api/recommendations')
+        .then(response => response.json())
+        .then(data => {
+            if (data.recommendations) {
+                location.reload();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            location.reload();
+        })
+        .finally(() => {
+            refreshBtn.innerHTML = originalContent;
+            refreshBtn.disabled = false;
+        });
+}
+
+function generateStudyPlan() {
+    const modal = new bootstrap.Modal(document.getElementById('studyPlanModal'));
+    modal.show();
+
+    {% if current_user.is_authenticated %}
+    fetch('/api/study-plan/{{ current_user.student.id if current_user.student else 0 }}', {
+        method: 'GET'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.task_id) {
+            checkStudyPlanStatus(data.task_id);
+        } else {
+            document.getElementById('studyPlanContent').innerHTML = `
+                <div class="alert alert-warning border-0 shadow-sm">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-exclamation-triangle me-3 text-warning"></i>
+                        <div>
+                            <h6 class="mb-1">Không thể tạo kế hoạch</h6>
+                            <p class="mb-0">Vui lòng thử lại sau hoặc làm thêm bài thi để có đủ dữ liệu phân tích.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        document.getElementById('studyPlanContent').innerHTML = `
+            <div class="alert alert-danger border-0 shadow-sm">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-times-circle me-3 text-danger"></i>
+                    <div>
+                        <h6 class="mb-1">Có lỗi xảy ra</h6>
+                        <p class="mb-0">Không thể tạo kế hoạch học tập. Vui lòng thử lại sau.</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    {% endif %}
+}
+
+function checkStudyPlanStatus(taskId) {
+    const checkStatus = () => {
+        fetch(`/api/study-plan-status/${taskId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'completed' && data.result) {
+                displayStudyPlan(data.result);
+            } else if (data.status === 'pending') {
+                setTimeout(checkStatus, 1000);
+            } else {
+                document.getElementById('studyPlanContent').innerHTML = `
+                    <div class="alert alert-warning border-0 shadow-sm">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-exclamation-triangle me-3 text-warning"></i>
+                            <div>
+                                <h6 class="mb-1">Không thể tạo kế hoạch</h6>
+                                <p class="mb-0">Vui lòng thử lại sau.</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('studyPlanContent').innerHTML = `
+                <div class="alert alert-danger border-0 shadow-sm">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-times-circle me-3 text-danger"></i>
+                        <div>
+                            <h6 class="mb-1">Có lỗi xảy ra</h6>
+                            <p class="mb-0">Không thể tải kế hoạch học tập.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    };
+    checkStatus();
+}
+
+function displayStudyPlan(studyPlan) {
+    let weeklyContent = '';
+    if (studyPlan.weekly_goals) {
+        studyPlan.weekly_goals.forEach(goal => {
+            weeklyContent += `
+                <div class="col-md-6 mb-3">
+                    <div class="card border-0 bg-light">
+                        <div class="card-body">
+                            <h6 class="mb-2">Tuần ${goal.week}</h6>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <small class="text-muted">Mục tiêu: ${goal.target_score} điểm</small><br>
+                                    <small class="text-muted">Môn: ${goal.focus_subject}</small>
+                                </div>
+                                <span class="badge bg-primary">${goal.study_hours}h/tuần</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    document.getElementById('studyPlanContent').innerHTML = `
+        <div class="alert alert-success border-0 shadow-sm mb-4">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-check-circle me-3 text-success"></i>
+                <div>
+                    <h6 class="mb-1">Kế hoạch đã được tạo thành công!</h6>
+                    <p class="mb-0">Dựa trên phân tích kết quả học tập của bạn</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12">
+                <h6 class="mb-3"><i class="fas fa-calendar-week me-2"></i>Kế hoạch học tập ${studyPlan.duration_weeks} tuần:</h6>
+            </div>
+            ${weeklyContent}
+
+            ${studyPlan.focus_areas && studyPlan.focus_areas.length > 0 ? `
+                <div class="col-12">
+                    <div class="alert alert-info border-0">
+                        <h6><i class="fas fa-target me-2"></i>Lĩnh vực cần tập trung:</h6>
+                        <div class="d-flex flex-wrap gap-2">
+                            ${studyPlan.focus_areas.map(area => `<span class="badge bg-info-subtle text-info">${area}</span>`).join('')}
+                        </div>
+                    </div>
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+function showRankingDetails() {
+    const modal = new bootstrap.Modal(document.getElementById('rankingModal'));
+    document.getElementById('rankingContent').innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Đang tải...</span>
+            </div>
+            <p class="mt-3 text-muted">Đang tải dữ liệu xếp hạng...</p>
+        </div>
+    `;
+    modal.show();
+
+    {% if current_user.is_authenticated %}
+    Promise.all([
+        fetch('/api/student-ranking/{{ current_user.id }}?timeframe=all'),
+        fetch('/api/student-ranking/{{ current_user.id }}?timeframe=month'),
+        fetch('/api/student-ranking/{{ current_user.id }}?timeframe=week'),
+        fetch('/api/leaderboard?timeframe=month&limit=20')
+    ])
+    .then(responses => {
+        responses.forEach(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+        });
+        return Promise.all(responses.map(r => r.json()));
+    })
+    .then(([overall, monthly, weekly, leaderboard]) => {
+        console.log('Ranking data:', { overall, monthly, weekly, leaderboard });
+
+        let content = `
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="text-center p-3 border rounded">
+                        <h4 class="text-primary">#${overall.rank || 'N/A'}</h4>
+                        <small class="text-muted">Tổng thể (${overall.total_students || 0} học sinh)</small>
+                        ${overall.avg_score ? `<br><small class="text-success">${overall.avg_score} điểm</small>` : ''}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center p-3 border rounded">
+                        <h4 class="text-success">#${monthly.rank || 'N/A'}</h4>
+                        <small class="text-muted">Tháng này (${monthly.total_students || 0} học sinh)</small>
+                        ${monthly.avg_score ? `<br><small class="text-success">${monthly.avg_score} điểm</small>` : ''}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center p-3 border rounded">
+                        <h4 class="text-warning">#${weekly.rank || 'N/A'}</h4>
+                        <small class="text-muted">Tuần này (${weekly.total_students || 0} học sinh)</small>
+                        ${weekly.avg_score ? `<br><small class="text-success">${weekly.avg_score} điểm</small>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        if (leaderboard && leaderboard.leaderboard && leaderboard.leaderboard.length > 0) {
+            content += `
+                <h6 class="mb-3">Top 20 học sinh tháng này:</h6>
+                <div class="list-group list-group-flush">
+            `;
+
+            leaderboard.leaderboard.forEach((leader, index) => {
+                content += `
+                    <div class="list-group-item d-flex align-items-center">
+                        <span class="badge bg-${leader.rank <= 3 ? 'primary' : 'secondary'} me-3">${leader.rank}</span>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0">${leader.student_name}</h6>
+                            <small class="text-muted">${leader.avg_score} điểm • ${leader.exam_count} bài thi</small>
+                        </div>
+                    </div>
+                `;
+            });
+
+            content += '</div>';
+        } else {
+            content += `
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Chưa có dữ liệu bảng xếp hạng tháng này.
+                </div>
+            `;
+        }
+
+        document.getElementById('rankingContent').innerHTML = content;
+    })
+    .catch(error => {
+        document.getElementById('rankingContent').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-times-circle me-2"></i>
+                Không thể tải dữ liệu xếp hạng. Lỗi: ${error.message}
+            </div>
+        `;
+    });
+    {% else %}
+    document.getElementById('rankingContent').innerHTML = `
+        <div class="alert alert-warning">
+            <i class="fas fa-sign-in-alt me-2"></i>
+            Vui lòng đăng nhập để xem xếp hạng.
+        </div>
+    `;
+    {% endif %}
+}
+
+setTimeout(() => {
+    location.reload();
+}, 300000);
+
+document.addEventListener('DOMContentLoaded', function() {
+    const rankingCards = document.querySelectorAll('.card .bg-light.rounded');
+    rankingCards.forEach(card => {
+        card.style.cursor = 'pointer';
+        card.addEventListener('click', showRankingDetails);
+    });
+});
+</script>
+{% endblock %}
