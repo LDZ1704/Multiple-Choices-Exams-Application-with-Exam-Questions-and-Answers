@@ -266,11 +266,12 @@ def get_remaining_time(user_id, exam_id, exam_duration_minutes):
 
 
 def get_exam_history_with_pagination(student_id, page=1, per_page=10, search_query=None, selected_subject=None, score_filter=None):
-    query = db.session.query(ExamResult).join(Exam).join(Subject).filter(ExamResult.student_id == student_id)
+    query = db.session.query(ExamResult).outerjoin(Exam).outerjoin(Subject).filter(ExamResult.student_id == student_id)
 
     if search_query and search_query.strip():
         query = query.filter(
             or_(
+                ExamResult.exam_name.contains(search_query.strip()),
                 Exam.exam_name.contains(search_query.strip()),
                 Subject.subject_name.contains(search_query.strip())
             )
@@ -307,6 +308,12 @@ def get_exam_result_with_details(result_id, student_id=None):
         result = (db.session.query(ExamResult).filter(ExamResult.id == result_id, ExamResult.student_id == student_id).first())
         if not result:
             return None
+
+        if not result.exam:
+            return {
+                'result': result,
+                'questions_with_answers': []
+            }
 
         session_obj = (db.session.query(ExamSession)
                        .filter(ExamSession.student_id == student_id, ExamSession.exam_id == result.exam_id, ExamSession.is_completed == True)
@@ -551,10 +558,10 @@ def get_exam_ranking_with_pagination(exam_id, page=1, per_page=20):
         User.avatar,
         func.row_number().over(order_by=[ExamResult.score.desc(), ExamResult.taken_exam.asc()]).label('rank')
     ).select_from(ExamResult) \
-        .join(Student, ExamResult.student_id == Student.id) \
-        .join(User, Student.user_id == User.id) \
+        .outerjoin(Student, ExamResult.student_id == Student.id) \
+        .outerjoin(User, Student.user_id == User.id) \
         .filter(
-        and_(ExamResult.exam_id == exam_id, ExamResult.is_first_attempt == True, User.id != creator_user_id)
+        and_(ExamResult.exam_id == exam_id, ExamResult.is_first_attempt == True, or_(User.id != creator_user_id, User.id.is_(None)))
     ).order_by(ExamResult.score.desc(), ExamResult.taken_exam.asc())
 
     return query.paginate(
@@ -572,9 +579,9 @@ def get_exam_highest_score(exam_id):
     creator_user_id = exam.user_id
 
     result = db.session.query(func.max(ExamResult.score)) \
-        .join(Student, ExamResult.student_id == Student.id) \
-        .join(User, Student.user_id == User.id) \
-        .filter(and_(ExamResult.exam_id == exam_id, ExamResult.is_first_attempt == True, User.id != creator_user_id)).scalar()
+        .outerjoin(Student, ExamResult.student_id == Student.id) \
+        .outerjoin(User, Student.user_id == User.id) \
+        .filter(and_(ExamResult.exam_id == exam_id, ExamResult.is_first_attempt == True, or_(User.id != creator_user_id, User.id.is_(None)))).scalar()
 
     return result if result else 0
 
@@ -587,9 +594,9 @@ def count_exam_participants(exam_id):
     creator_user_id = exam.user_id
 
     return db.session.query(ExamResult.student_id) \
-        .join(Student, ExamResult.student_id == Student.id) \
-        .join(User, Student.user_id == User.id) \
-        .filter(and_(ExamResult.exam_id == exam_id, ExamResult.is_first_attempt == True, User.id != creator_user_id)).distinct().count()
+        .outerjoin(Student, ExamResult.student_id == Student.id) \
+        .outerjoin(User, Student.user_id == User.id) \
+        .filter(and_(ExamResult.exam_id == exam_id, ExamResult.is_first_attempt == True, or_(User.id != creator_user_id, User.id.is_(None)))).distinct().count()
 
 
 def get_exam_average_score(exam_id):
@@ -599,9 +606,9 @@ def get_exam_average_score(exam_id):
 
     creator_user_id = exam.user_id
     result = db.session.query(func.avg(ExamResult.score)) \
-        .join(Student, ExamResult.student_id == Student.id) \
-        .join(User, Student.user_id == User.id) \
-        .filter(and_(ExamResult.exam_id == exam_id, ExamResult.is_first_attempt == True, User.id != creator_user_id)).scalar()
+        .outerjoin(Student, ExamResult.student_id == Student.id) \
+        .outerjoin(User, Student.user_id == User.id) \
+        .filter(and_(ExamResult.exam_id == exam_id, ExamResult.is_first_attempt == True, or_(User.id != creator_user_id, User.id.is_(None)))).scalar()
     return round(result, 1) if result else 0
 
 

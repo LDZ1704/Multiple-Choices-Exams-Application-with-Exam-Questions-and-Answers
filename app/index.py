@@ -245,7 +245,7 @@ def exam_detail():
 
     exam = dao.get_exam_by_id(exam_id)
     if not exam:
-        flash('Đề thi không tồn tại!', 'error')
+        flash('Đề thi này đã bị xóa hoặc không tồn tại!', 'error')
         return redirect(url_for('index'))
 
     if current_user.is_authenticated:
@@ -709,7 +709,7 @@ def get_subject_category(subject_name):
 def doing_exam(exam_id):
     exam = dao.get_exam_by_id(exam_id)
     if not exam:
-        flash('Đề thi không tồn tại!', 'error')
+        flash('Đề thi này đã bị xóa hoặc không tồn tại! Bạn không thể làm bài thi này.', 'error')
         return redirect(url_for('index'))
 
     student = dao.get_student_by_user_id(current_user.id)
@@ -1051,6 +1051,9 @@ def view_exam_result(result_id):
         flash('Kết quả thi không tồn tại!', 'error')
         return redirect(url_for('index'))
 
+    if not result_data['result'].exam:
+        result_data['questions_with_answers'] = None
+
     return render_template('exam-result.html', result=result_data['result'], questions_with_answers=result_data['questions_with_answers'])
 
 
@@ -1168,7 +1171,8 @@ def get_exam_history_charts(user_id):
     if not current_student:
         return jsonify({'error': 'Không tìm thấy thông tin học sinh!'}), 404
 
-    results = dao.get_student_exam_results(current_student.id)
+    results = db.session.query(ExamResult).outerjoin(Exam).outerjoin(Subject).filter(ExamResult.student_id == current_student.id).order_by(ExamResult.taken_exam).all()
+
     if not results:
         return jsonify({
             'score_trend': {'labels': [], 'data': []},
@@ -1186,7 +1190,13 @@ def get_exam_history_charts(user_id):
 
     subject_scores = {}
     for result in results:
-        subject_name = result.exam.subject.subject_name
+        if result.exam and result.exam.subject:
+            subject_name = result.exam.subject.subject_name
+        elif result.exam_name:
+            subject_name = f"{result.exam_name} (Đã xóa)"
+        else:
+            subject_name = "Đề thi đã xóa"
+
         if subject_name not in subject_scores:
             subject_scores[subject_name] = []
         subject_scores[subject_name].append(result.score)
@@ -1210,15 +1220,23 @@ def get_exam_history_charts(user_id):
 
     monthly_labels = list(monthly_stats.keys())[-12:]
     monthly_avg_scores = [monthly_stats[month]['sum_score'] / monthly_stats[month]['total'] for month in monthly_labels]
+
     time_labels = []
     time_efficiency = []
     time_scores = []
     for result in results[-15:]:
-        if result.time_taken:
-            time_labels.append(result.exam.exam_name[:20] + '...' if len(result.exam.exam_name) > 20 else result.exam.exam_name)
+        if result.time_taken and result.exam and result.exam.duration:
+            exam_name = result.exam.exam_name
+            time_labels.append(exam_name[:20] + '...' if len(exam_name) > 20 else exam_name)
             time_ratio = result.time_taken / (result.exam.duration * 60)
             time_efficiency.append(round(result.score / time_ratio, 1) if time_ratio > 0 else 0)
             time_scores.append(result.score)
+        elif result.exam_name:
+            exam_name = result.exam_name + " (Đã xóa)"
+            time_labels.append(exam_name[:20] + '...' if len(exam_name) > 20 else exam_name)
+            time_efficiency.append(0)
+            time_scores.append(result.score)
+
     return jsonify({
         'score_trend': {
             'labels': score_trend_labels,
@@ -1472,6 +1490,7 @@ def recommendations():
     leaderboard = recommendation_engine.get_leaderboard(limit=10)
     badges = recommendation_engine.get_achievement_badges(student.id)
     return render_template('recommendations.html',
+                           student=student,
                            analysis=analysis,
                            recommendations=recommendations,
                            overall_ranking=overall_ranking,

@@ -607,9 +607,9 @@ function showRankingDetails() {
 
     {% if current_user.is_authenticated %}
     Promise.all([
-        fetch('/api/student-ranking/{{ current_user.id }}?timeframe=all'),
-        fetch('/api/student-ranking/{{ current_user.id }}?timeframe=month'),
-        fetch('/api/student-ranking/{{ current_user.id }}?timeframe=week'),
+        fetch('/api/student-ranking/{{ student.id }}?timeframe=all'),
+        fetch('/api/student-ranking/{{ student.id }}?timeframe=month'),
+        fetch('/api/student-ranking/{{ student.id }}?timeframe=week'),
         fetch('/api/leaderboard?timeframe=month&limit=20')
     ])
     .then(responses => {

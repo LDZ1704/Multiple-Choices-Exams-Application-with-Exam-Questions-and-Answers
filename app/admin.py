@@ -129,7 +129,10 @@ class UserAdmin(AuthenticatedView):
             if model.role == Role.STUDENT:
                 student = Student.query.filter_by(user_id=model.id).first()
                 if student:
-                    ExamResult.query.filter_by(student_id=student.id).delete()
+                    exam_results = ExamResult.query.filter_by(student_id=student.id).all()
+                    for result in exam_results:
+                        result.student_name = model.name
+                        result.student_id = None
                     ExamSession.query.filter_by(student_id=student.id).delete()
                     StudyRecommendation.query.filter_by(student_id=student.id).delete()
                     LearningPath.query.filter_by(student_id=student.id).delete()
@@ -140,8 +143,11 @@ class UserAdmin(AuthenticatedView):
                 admin_record = Admin.query.filter_by(user_id=model.id).first()
                 exams = Exam.query.filter_by(user_id=model.id).all()
                 for exam in exams:
+                    exam_results = ExamResult.query.filter_by(exam_id=exam.id).all()
+                    for result in exam_results:
+                        result.exam_name = exam.exam_name
+                        result.exam_id = None
                     Rating.query.filter_by(exam_id=exam.id).delete()
-                    ExamResult.query.filter_by(exam_id=exam.id).delete()
                     ExamQuestions.query.filter_by(exam_id=exam.id).delete()
                     Comment.query.filter_by(exam_id=exam.id).delete()
                     ExamSession.query.filter_by(exam_id=exam.id).delete()
@@ -204,8 +210,24 @@ class ExamAdmin(AuthenticatedView):
             model.createAt = datetime.now()
 
     def on_model_delete(self, model):
-        if ExamResult.query.filter_by(exam_id=model.id).first():
-            raise Exception('Không thể xóa đề thi đã có người thi')
+        try:
+            exam_results = ExamResult.query.filter_by(exam_id=model.id).all()
+            for result in exam_results:
+                if not result.exam_name:
+                    result.exam_name = model.exam_name
+                result.exam_id = None
+            Rating.query.filter_by(exam_id=model.id).delete()
+            ExamSession.query.filter_by(exam_id=model.id).delete()
+            SuspiciousActivity.query.filter_by(exam_id=model.id).delete()
+            Notification.query.filter_by(exam_id=model.id).delete()
+            Comment.query.filter_by(exam_id=model.id).delete()
+            ExamQuestions.query.filter_by(exam_id=model.id).delete()
+
+            db.session.commit()
+
+        except Exception as e:
+            db.session.rollback()
+            raise Exception(f'Không thể xóa đề thi: {str(e)}')
 
 
 class QuestionAdmin(AuthenticatedView):

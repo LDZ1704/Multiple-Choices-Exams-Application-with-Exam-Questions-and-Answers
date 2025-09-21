@@ -109,8 +109,10 @@ class Answer(Base):
 
 
 class ExamResult(Base):
-    student_id = Column(Integer, ForeignKey('student.id'), nullable=False)
-    exam_id = Column(Integer, ForeignKey('exam.id'), nullable=False)
+    student_id = Column(Integer, ForeignKey('student.id', ondelete='SET NULL'), nullable=True)
+    exam_id = Column(Integer, ForeignKey('exam.id', ondelete='SET NULL'), nullable=True)
+    student_name = Column(String(100), nullable=True)
+    exam_name = Column(String(100), nullable=True)
     score = Column(Integer, nullable=False, default=0)
     taken_exam = Column(DateTime, nullable=False, default=datetime.datetime.now)
     time_taken = Column(Integer, nullable=True, default=0)  #(giây)

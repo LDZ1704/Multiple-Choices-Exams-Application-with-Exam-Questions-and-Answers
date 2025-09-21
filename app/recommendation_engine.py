@@ -25,6 +25,8 @@ class RecommendationEngine:
         performance_data = []
         for result in results:
             exam = result.exam
+            if exam is None:
+                continue
             performance_data.append({
                 'exam_id': exam.id,
                 'subject_id': exam.subject_id,
@@ -34,7 +36,13 @@ class RecommendationEngine:
                 'date': result.taken_exam
             })
 
+        if not performance_data:
+            return None
+
         df = pd.DataFrame(performance_data)
+
+        if df.empty:
+            return None
 
         analysis = {
             'total_exams': len(results),
@@ -72,20 +80,19 @@ class RecommendationEngine:
         return list(set(weak_topics))
 
     def get_wrong_questions(self, student_id, subject_name):
-        results = db.session.query(ExamResult).join(Exam).join(Subject).filter(ExamResult.student_id == student_id, Subject.subject_name == subject_name).all()
+        results = db.session.query(ExamResult).join(Exam).join(Subject).filter(ExamResult.student_id == student_id, Subject.subject_name == subject_name, ExamResult.exam_id.isnot(None)).all()
 
         wrong_questions = []
         for result in results:
+            if result.exam is None:
+                continue
             if result.user_answers:
                 questions = db.session.query(Question).join(ExamQuestions).filter(ExamQuestions.exam_id == result.exam_id).all()
-
                 for question in questions:
                     user_answer_id = result.user_answers.get(str(question.id))
                     correct_answer = db.session.query(Answer).filter(Answer.question_id == question.id, Answer.is_correct == True).first()
-
                     if not user_answer_id or (correct_answer and int(user_answer_id) != correct_answer.id):
                         wrong_questions.append(question.question_title)
-
         return wrong_questions
 
     def extract_topics_from_questions(self, questions):
@@ -179,15 +186,14 @@ class RecommendationEngine:
         return materials
 
     def recommend_practice_exams(self, student_id, subject_name):
+        if not subject_name:
+            return []
         subject = db.session.query(Subject).filter(Subject.subject_name == subject_name).first()
-
         if not subject:
             return []
 
-        completed_exams = db.session.query(ExamResult.exam_id).filter(ExamResult.student_id == student_id).subquery()
-
+        completed_exams = db.session.query(ExamResult.exam_id).filter(ExamResult.student_id == student_id, ExamResult.exam_id.isnot(None)).subquery()
         recommended_exams = db.session.query(Exam).filter(Exam.subject_id == subject.id, ~Exam.id.in_(completed_exams)).limit(5).all()
-
         recommendations = []
         for exam in recommended_exams:
             recommendations.append({

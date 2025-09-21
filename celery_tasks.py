@@ -2,9 +2,6 @@ from celery import Celery
 from datetime import datetime, timedelta
 import requests
 import random
-from app import app, db
-from app.models import User, Student, ExamResult, StudyRecommendation, LearningPath, ExamSession, Subject, Exam
-from app.recommendation_engine import recommendation_engine
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -28,31 +25,41 @@ def make_celery(app):
     return celery
 
 
-celery = make_celery(app)
+# Import app và các models sau khi định nghĩa make_celery để tránh circular import
+def get_app_context():
+    from app import app, db
+    from app.models import User, Student, ExamResult, StudyRecommendation, LearningPath, ExamSession, Subject, Exam
+    from app.recommendation_engine import recommendation_engine
+    return app, db, User, Student, ExamResult, StudyRecommendation, LearningPath, ExamSession, Subject, Exam, recommendation_engine
 
 
-celery.conf.beat_schedule = {
-    'generate-daily-recommendations': {
-        'task': 'celery_tasks.generate_daily_recommendations',
-        'schedule': 3600.0,
-    },
-    'send-study-reminders': {
-        'task': 'celery_tasks.send_study_reminders',
-        'schedule': 86400.0,
-    },
-    'analyze-learning-patterns': {
-        'task': 'celery_tasks.analyze_learning_patterns',
-        'schedule': 21600.0,
-    },
-    'cleanup-old-sessions': {
-        'task': 'celery_tasks.cleanup_old_sessions',
-        'schedule': 43200.0,
+celery = None
+
+
+# Beat schedule sẽ được cấu hình sau khi celery được khởi tạo
+def configure_beat_schedule(celery_instance):
+    celery_instance.conf.beat_schedule = {
+        'generate-daily-recommendations': {
+            'task': 'celery_tasks.generate_daily_recommendations',
+            'schedule': 3600.0,
+        },
+        'send-study-reminders': {
+            'task': 'celery_tasks.send_study_reminders',
+            'schedule': 86400.0,
+        },
+        'analyze-learning-patterns': {
+            'task': 'celery_tasks.analyze_learning_patterns',
+            'schedule': 21600.0,
+        },
+        'cleanup-old-sessions': {
+            'task': 'celery_tasks.cleanup_old_sessions',
+            'schedule': 43200.0,
+        }
     }
-}
 
 
-@celery.task
 def generate_daily_recommendations():
+    app, db, User, Student, ExamResult, StudyRecommendation, LearningPath, ExamSession, Subject, Exam, recommendation_engine = get_app_context()
     with app.app_context():
         students = db.session.query(Student).all()
 
@@ -84,11 +91,20 @@ def generate_daily_recommendations():
                 db.session.rollback()
 
 
-@celery.task
 def send_study_reminders():
+    app, db, User, Student, ExamResult, StudyRecommendation, LearningPath, ExamSession, Subject, Exam, recommendation_engine = get_app_context()
     with app.app_context():
         cutoff_date = datetime.now() - timedelta(days=3)
-        inactive_students = db.session.query(Student).join(User).outerjoin(ExamResult).group_by(Student.id).having(db.func.max(ExamResult.taken_exam) < cutoff_date).all()
+        inactive_students = db.session.query(Student).join(User).filter(
+            Student.id.in_(
+                db.session.query(ExamResult.student_id).filter(
+                    ExamResult.taken_exam < cutoff_date
+                ).group_by(ExamResult.student_id).having(
+                    db.func.max(ExamResult.taken_exam) < cutoff_date
+                )
+            )
+        ).all()
+        
         for student in inactive_students:
             try:
                 user = student.user
@@ -100,14 +116,20 @@ def send_study_reminders():
                 print(f"Error sending reminder to student {student.id}: {e}")
 
 
-@celery.task
 def send_reminder_email(email, name):
+    app, db, User, Student, ExamResult, StudyRecommendation, LearningPath, ExamSession, Subject, Exam, recommendation_engine = get_app_context()
     try:
+        if not all([app.config.get('MAIL_USERNAME'), app.config.get('MAIL_PASSWORD'), 
+                   app.config.get('MAIL_SERVER'), app.config.get('MAIL_PORT')]):
+            print("Email configuration missing")
+            return False
+            
         msg = MIMEMultipart()
         msg['From'] = app.config['MAIL_USERNAME']
         msg['To'] = email
         msg['Subject'] = 'Đã lâu rồi bạn không học! - LmaoQuiz'
 
+        base_url = app.config.get('BASE_URL', 'http://localhost:5000')
         body = f"""
         <html>
         <body>
@@ -123,7 +145,7 @@ def send_reminder_email(email, name):
                 </ul>
             </div>
 
-            <p><a href="{app.config['BASE_URL']}" style="background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">Tiếp tục học tập</a></p>
+            <p><a href="{base_url}" style="background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">Tiếp tục học tập</a></p>
 
             <p>Chúc bạn học tập hiệu quả!</p>
             <p>Đội ngũ LmaoQuiz</p>
@@ -146,8 +168,8 @@ def send_reminder_email(email, name):
         return False
 
 
-@celery.task
 def analyze_learning_patterns():
+    app, db, User, Student, ExamResult, StudyRecommendation, LearningPath, ExamSession, Subject, Exam, recommendation_engine = get_app_context()
     with app.app_context():
         students = db.session.query(Student).all()
         for student in students:
@@ -161,8 +183,8 @@ def analyze_learning_patterns():
                 print(f"Error analyzing patterns for student {student.id}: {e}")
 
 
-@celery.task
 def update_learning_path(student_id, analysis):
+    app, db, User, Student, ExamResult, StudyRecommendation, LearningPath, ExamSession, Subject, Exam, recommendation_engine = get_app_context()
     with app.app_context():
         try:
             worst_subject = analysis.get('worst_subject')
@@ -189,7 +211,6 @@ def update_learning_path(student_id, analysis):
                 learning_path.current_level = 'advanced'
                 learning_path.estimated_completion_days = 10
 
-            # Tính progress percentage
             total_exams = analysis.get('total_exams', 0)
             subject_exams = db.session.query(Exam).filter(Exam.subject_id == subject.id).count()
             if subject_exams > 0:
@@ -203,7 +224,6 @@ def update_learning_path(student_id, analysis):
             db.session.rollback()
 
 
-@celery.task
 def send_motivation_message(user_id):
     motivation_messages = [
         "💪 Đừng bỏ cuộc! Mỗi thất bại là một bước tiến!",
@@ -220,8 +240,8 @@ def send_motivation_message(user_id):
     print(f"Sent motivation message to user {user_id}: {message}")
 
 
-@celery.task
 def cleanup_old_sessions():
+    app, db, User, Student, ExamResult, StudyRecommendation, LearningPath, ExamSession, Subject, Exam, recommendation_engine = get_app_context()
     with app.app_context():
         try:
             cutoff_date = datetime.now() - timedelta(days=7)
@@ -238,8 +258,8 @@ def cleanup_old_sessions():
             db.session.rollback()
 
 
-@celery.task
 def process_exam_analytics():
+    app, db, User, Student, ExamResult, StudyRecommendation, LearningPath, ExamSession, Subject, Exam, recommendation_engine = get_app_context()
     with app.app_context():
         try:
             exams = db.session.query(Exam).all()
@@ -270,7 +290,6 @@ def process_exam_analytics():
             db.session.rollback()
 
 
-@celery.task
 def sync_external_resources():
     try:
         sync_google_books_data.delay()
@@ -279,13 +298,15 @@ def sync_external_resources():
         print(f"Error syncing external resources: {e}")
 
 
-@celery.task
 def sync_google_books_data():
+    app, db, User, Student, ExamResult, StudyRecommendation, LearningPath, ExamSession, Subject, Exam, recommendation_engine = get_app_context()
     subjects = ['toán học', 'ngữ văn', 'tiếng anh', 'vật lý', 'hóa học', 'sinh học']
 
     for subject in subjects:
         try:
-            url = f"https://www.googleapis.com/books/v1/volumes?q={subject}+giáo+trình&maxResults=10"
+            api_key = app.config.get('GOOGLE_BOOKS_API_KEY')
+
+            url = f"https://www.googleapis.com/books/v1/volumes?q={subject}+giáo+trình&maxResults=10&key={api_key}"
             response = requests.get(url)
 
             if response.status_code == 200:
@@ -297,15 +318,16 @@ def sync_google_books_data():
                 # redis_client.setex(cache_key, 86400, json.dumps(books))  # Cache 1 ngày
 
                 print(f"Synced {len(books)} books for {subject}")
-
         except Exception as e:
             print(f"Error syncing books for {subject}: {e}")
 
 
-@celery.task
 def sync_youtube_educational_content():
+    app, db, User, Student, ExamResult, StudyRecommendation, LearningPath, ExamSession, Subject, Exam, recommendation_engine = get_app_context()
     try:
-        youtube = build('youtube', 'v3', developerKey='AIzaSyADy2hvEAHa3QEEOePUQAxxeOuw24H31iw')
+        youtube_api_key = app.config.get('YOUTUBE_API_KEY')
+            
+        youtube = build('youtube', 'v3', developerKey=youtube_api_key)
         subjects = ['toán học', 'ngữ văn', 'tiếng anh', 'vật lý', 'hóa học']
 
         for subject in subjects:
@@ -330,8 +352,8 @@ def sync_youtube_educational_content():
         print(f"Error syncing YouTube content: {e}")
 
 
-@celery.task
 def generate_personalized_study_plan(student_id):
+    app, db, User, Student, ExamResult, StudyRecommendation, LearningPath, ExamSession, Subject, Exam, recommendation_engine = get_app_context()
     with app.app_context():
         try:
             student = db.session.query(Student).get(student_id)
@@ -377,8 +399,8 @@ def generate_personalized_study_plan(student_id):
             return None
 
 
-@celery.task
 def send_weekly_progress_report(student_id):
+    app, db, User, Student, ExamResult, StudyRecommendation, LearningPath, ExamSession, Subject, Exam, recommendation_engine = get_app_context()
     with app.app_context():
         try:
             student = db.session.query(Student).get(student_id)
@@ -410,8 +432,8 @@ def send_weekly_progress_report(student_id):
             print(f"Error sending progress report: {e}")
 
 
-@celery.task
 def send_progress_report_email(email, name, report):
+    app, db, User, Student, ExamResult, StudyRecommendation, LearningPath, ExamSession, Subject, Exam, recommendation_engine = get_app_context()
     try:
         msg = MIMEMultipart()
         msg['From'] = app.config['MAIL_USERNAME']
@@ -465,3 +487,30 @@ def send_progress_report_email(email, name, report):
     except Exception as e:
         print(f"Error sending progress report email: {e}")
         return False
+
+
+# Function để đăng ký tất cả các task với celery instance
+def register_celery_tasks(celery_instance):
+    global celery
+    celery = celery_instance
+
+    # Đăng ký các task
+    celery.task(generate_daily_recommendations)
+    celery.task(send_study_reminders)
+    celery.task(send_reminder_email)
+    celery.task(analyze_learning_patterns)
+    celery.task(update_learning_path)
+    celery.task(send_motivation_message)
+    celery.task(cleanup_old_sessions)
+    celery.task(process_exam_analytics)
+    celery.task(sync_external_resources)
+    celery.task(sync_google_books_data)
+    celery.task(sync_youtube_educational_content)
+    celery.task(generate_personalized_study_plan)
+    celery.task(send_weekly_progress_report)
+    celery.task(send_progress_report_email)
+    
+    # Cấu hình beat schedule
+    configure_beat_schedule(celery_instance)
+    
+    print("All Celery tasks registered successfully")

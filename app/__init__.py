@@ -6,6 +6,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_admin import Admin
 from websocket_client import ws_client
 import warnings
+from celery_tasks import make_celery, register_celery_tasks
 warnings.filterwarnings("ignore", category=UserWarning, module="flask_admin")
 
 app = Flask(__name__)
@@ -28,6 +29,10 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 app.config['broker_url'] = 'redis://localhost:6379/0'
 app.config['result_backend'] = 'redis://localhost:6379/0'
 
+app.config['YOUTUBE_API_KEY'] = 'AIzaSyADy2hvEAHa3QEEOePUQAxxeOuw24H31iw'
+app.config['GOOGLE_BOOKS_API_KEY'] = 'AIzaSyADy2hvEAHa3QEEOePUQAxxeOuw24H31iw'
+app.config['GOOGLE_GEMINI_API_KEY'] = 'AIzaSyDYEEhe6csJiijQSf8ptmPi-ZBPX8CIsBg'
+
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 
@@ -42,5 +47,9 @@ cloudinary.config(
     api_secret="vZN_2d4jJOvSwlCFRp7pU_zgH58",
     secure=True
 )
+
+celery = make_celery(app)
+if celery:
+    register_celery_tasks(celery)
 
 ws_client.start()

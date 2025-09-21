@@ -151,16 +151,26 @@
                         <div class="col-md-6">
                             <h5 class="card-title text-primary mb-2">
                                 <i class="fas fa-file-alt me-2"></i>
-                                {{ result.exam.exam_name }}
+                                {{ result.exam_name or result.exam.exam_name }}
+                                {% if not result.exam %}
+                                    <span class="badge bg-secondary ms-2">Đã xóa</span>
+                                {% endif %}
                             </h5>
-                            <p class="text-muted mb-1">
-                                <i class="fas fa-clock me-2"></i>
-                                <strong>Thời gian:</strong> {{ result.exam.duration }} phút
-                            </p>
-                            <p class="text-muted mb-1">
-                                <i class="fas fa-book me-2"></i>
-                                <strong>Môn học:</strong> {{ result.exam.subject.subject_name }}
-                            </p>
+                            {% if result.exam %}
+                                <p class="text-muted mb-1">
+                                    <i class="fas fa-clock me-2"></i>
+                                    <strong>Thời gian:</strong> {{ result.exam.duration }} phút
+                                </p>
+                                <p class="text-muted mb-1">
+                                    <i class="fas fa-book me-2"></i>
+                                    <strong>Môn học:</strong> {{ result.exam.subject.subject_name }}
+                                </p>
+                            {% else %}
+                                <p class="text-muted mb-1">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <strong>Trạng thái:</strong> Đề thi này đã bị xóa bởi người tạo
+                                </p>
+                            {% endif %}
                             <p class="text-muted mb-1">
                                 <i class="fas fa-calendar me-2"></i>
                                 <strong>Ngày thi:</strong> {{ result.taken_exam.strftime('%d/%m/%Y %H:%M') }}
@@ -220,10 +230,17 @@
                                     <i class="fas fa-eye me-1"></i>
                                     Xem Chi Tiết
                                 </a>
-                                <a href="{{ url_for('doing_exam', exam_id=result.exam.id) }}" class="btn btn-outline-primary btn-sm hover-underline-center">
-                                    <i class="fas fa-redo me-1"></i>
-                                    Làm Lại
-                                </a>
+                                {% if result.exam %}
+                                    <a href="{{ url_for('doing_exam', exam_id=result.exam.id) }}" class="btn btn-outline-primary btn-sm hover-underline-center">
+                                        <i class="fas fa-redo me-1"></i>
+                                        Làm Lại
+                                    </a>
+                                {% else %}
+                                    <button class="btn btn-outline-secondary btn-sm" disabled title="Đề thi đã bị xóa">
+                                        <i class="fas fa-ban me-1"></i>
+                                        Không thể làm lại
+                                    </button>
+                                {% endif %}
                             </div>
                         </div>
                     </div>

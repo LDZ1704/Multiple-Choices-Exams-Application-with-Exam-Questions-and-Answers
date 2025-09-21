@@ -1,10 +1,15 @@
 import google.generativeai as genai
-from app import dao
+from app import dao, app
 
 
 class SmartChatBot:
     def __init__(self):
-        genai.configure(api_key="AIzaSyDYEEhe6csJiijQSf8ptmPi-ZBPX8CIsBg")
+        # Lấy API key từ config
+        api_key = app.config.get('GOOGLE_GEMINI_API_KEY')
+        if not api_key:
+            raise ValueError("Google Gemini API key not configured")
+        
+        genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-1.5-flash')
 
         self.system_context = """

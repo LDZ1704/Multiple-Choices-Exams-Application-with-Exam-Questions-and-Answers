@@ -170,9 +170,22 @@ def save_exam_result(student_id, exam_id, score, answers, time_taken_seconds):
         existing_result = ExamResult.query.filter_by(student_id=student_id, exam_id=exam_id).first()
         is_first_attempt = existing_result is None
 
+        student = db.session.query(Student).get(student_id)
+        exam = dao.get_exam_by_id(exam_id)
+
+        student_name = None
+        exam_name = None
+
+        if student and student.user:
+            student_name = student.user.name
+        if exam:
+            exam_name = exam.exam_name
+
         exam_result = ExamResult(
             student_id=student_id,
             exam_id=exam_id,
+            student_name=student_name,
+            exam_name=exam_name,
             score=score,
             taken_exam=datetime.now(),
             time_taken=time_taken_seconds,
