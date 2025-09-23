@@ -1,0 +1,7 @@
+(cần hoàn thiện thêm)
+celery:
+celery -A celery_tasks.celery worker --loglevel=info
+celery -A celery_tasks.celery beat --loglevel=info
+
+websocket:
+python websocket_server.py

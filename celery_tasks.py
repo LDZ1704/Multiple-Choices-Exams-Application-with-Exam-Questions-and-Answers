@@ -512,5 +512,3 @@ def register_celery_tasks(celery_instance):
     
     # Cấu hình beat schedule
     configure_beat_schedule(celery_instance)
-    
-    print("All Celery tasks registered successfully")
