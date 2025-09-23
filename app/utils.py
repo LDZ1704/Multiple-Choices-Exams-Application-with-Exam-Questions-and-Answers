@@ -28,15 +28,16 @@ def update_password(user_id, new_password):
 def update_user_info(user_id, username, name, email, gender):
     try:
         user = dao.get_user_by_id(user_id)
-        if user:
-            user.name = name
-            user.username = username
-            user.email = email
-            user.gender = gender
-            user.updateAt = datetime.now()
-            db.session.commit()
-            return True
-        return False
+        if not user:
+            return False
+
+        user.name = name
+        user.username = username
+        user.email = email
+        user.gender = gender
+        user.updateAt = datetime.now()
+        db.session.commit()
+        return True
     except Exception as e:
         db.session.rollback()
         print(f"Lỗi cập nhật thông tin: {e}")

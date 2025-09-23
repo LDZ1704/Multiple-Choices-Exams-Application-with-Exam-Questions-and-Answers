@@ -54,7 +54,7 @@ def add_admin(user):
 
 
 def check_email_exists(email, exclude_user_id=None):
-    query = get_user_by_email(email)
+    query = User.query.filter_by(email=email)
     if exclude_user_id:
         query = query.filter(User.id != exclude_user_id)
     return query.first() is not None

@@ -187,11 +187,12 @@ def logout():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     regex_username = '^(?=.*[a-zA-Z])(?=.*[0-9])[a-zA-Z0-9]+$'
+    regex_password = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$'
     username = email = name = gender = ''
     if request.method == 'POST':
         username = request.form['username'].strip()
         email = request.form['email']
-        name = request.form['name']
+        name = request.form['name'].strip()
         password = request.form['password']
         confirm_password = request.form['confirm-password']
         gender = request.form.get('gender')
@@ -207,8 +208,21 @@ def register():
         elif not re.fullmatch(regex_username, username):
             flash('Tên tài khoản phải có cả chữ và số!', 'danger')
             has_error = True
-        if len(username) < 3:
-            flash('Tên tài khoản phải có ít nhất 3 ký tự!', 'danger')
+        if len(username) < 6:
+            flash('Tên tài khoản phải có ít nhất 6 ký tự!', 'danger')
+            has_error = True
+        if name:
+            if len(name) < 2 or len(name) > 50:
+                flash('Tên phải có 2-50 ký tự!', 'danger')
+                has_error = True
+            elif any(char.isdigit() or char in '!@#$%^&*()_+=[]{}|;:"<>,.?/~`' for char in name):
+                flash('Tên không được chứa số hoặc ký tự đặc biệt!', 'danger')
+                has_error = True
+            elif name.isspace():
+                flash('Tên không được chỉ chứa khoảng trắng!', 'danger')
+                has_error = True
+        if not re.fullmatch(regex_password, password):
+            flash('Mật khẩu phải có ít nhất 6 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt!', 'danger')
             has_error = True
         if not password.__eq__(confirm_password):
             flash('Bạn phải xác nhận lại mật khẩu giống mật khẩu của bạn.', 'danger')
@@ -435,33 +449,63 @@ def account_detail():
 @app.route('/update-account', methods=['POST'])
 @login_required
 def update_account():
+    regex_email = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    regex_username = r'^(?=.*[a-zA-Z])(?=.*[0-9])[a-zA-Z0-9]{6,20}$'
+
     try:
         user_id = session.get('_user_id')
-        username = request.form.get('username')
-        name = request.form.get('name')
-        email = request.form.get('email')
+        username = request.form.get('username').strip()
+        name = request.form.get('name').strip()
+        email = request.form.get('email').strip().lower()
         gender = request.form.get('gender')
 
-        if request.method == 'POST':
-            if not name or not email or not gender or not username:
-                flash('Vui lòng điền đầy đủ thông tin!', 'error')
-                return redirect(url_for('account_detail'))
-            if '@' not in email:
-                flash('Email không hợp lệ!', 'error')
-                return redirect(url_for('account_detail'))
-            if dao.check_email_exists(email, user_id):
-                flash('Email đã tồn tại trong hệ thống!', 'error')
-                return redirect(url_for('account_detail'))
+        has_error = False
 
-            if utils.update_user_info(user_id, username, name, email, gender):
-                flash('Cập nhật thông tin thành công!', 'success')
-            else:
-                flash('Có lỗi xảy ra khi cập nhật thông tin!', 'error')
+        if not all([username, name, email, gender]):
+            flash('Vui lòng điền đầy đủ thông tin!', 'error')
+            has_error = True
+        if username:
+            if not re.fullmatch(regex_username, username):
+                flash('Tên tài khoản phải có 6-20 ký tự, bao gồm cả chữ và số!', 'error')
+                has_error = True
+            elif dao.existence_check(User, 'username', username):
+                existing_user = User.query.filter(User.username == username, User.id != user_id).first()
+                if existing_user:
+                    flash('Tên tài khoản này đã tồn tại!', 'error')
+                    has_error = True
+        if email:
+            if not re.fullmatch(regex_email, email):
+                flash('Email không hợp lệ! Vui lòng nhập đúng định dạng.', 'error')
+                has_error = True
+            elif dao.check_email_exists(email, user_id):
+                flash('Email đã tồn tại trong hệ thống!', 'error')
+                has_error = True
+        if name:
+            if len(name) < 2 or len(name) > 50:
+                flash('Tên phải có 2-50 ký tự!', 'error')
+                has_error = True
+            elif any(char.isdigit() or char in '!@#$%^&*()_+=[]{}|;:"<>,.?/~`' for char in name):
+                flash('Tên không được chứa số hoặc ký tự đặc biệt!', 'error')
+                has_error = True
+            elif name.isspace():
+                flash('Tên không được chỉ chứa khoảng trắng!', 'error')
+                has_error = True
+        if gender and gender not in ['Male', 'Female']:
+            flash('Giới tính không hợp lệ!', 'error')
+            has_error = True
+        if has_error:
+            return redirect(url_for('account_detail'))
+        if utils.update_user_info(user_id, username, name, email, gender):
+            flash('Cập nhật thông tin thành công!', 'success')
+        else:
+            flash('Có lỗi xảy ra khi cập nhật thông tin!', 'error')
 
         return redirect(url_for('account_detail'))
+
     except Exception as e:
         print(f"Lỗi chỉnh sửa thông tin: {e}")
-        return False
+        flash('Có lỗi hệ thống xảy ra. Vui lòng thử lại!', 'error')
+        return redirect(url_for('account_detail'))
 
 
 @app.route('/update-avatar', methods=['POST'])
